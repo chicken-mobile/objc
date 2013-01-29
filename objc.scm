@@ -16,18 +16,18 @@
     "C_return(class_getName(*clazz));"))
 
 
-(let ((class-count (objc-get-class-list #f 0)))
-  (let-location ((classes objc-class (allocate (* objc-class-size class-count))))
-    (let* ((return-count (objc-get-class-list classes class-count))
-	   (class-list 
-	    (fold (lambda (class-idx class-list)
-		    (cons (pointer+ classes (* objc-class-size class-idx)) class-list))
-		  '() (iota return-count))))
+(define (class-list)
+  (let ((class-count (objc-get-class-list #f 0)))
+    (let-location ((classes objc-class (allocate (* objc-class-size class-count))))
+      (let ((return-count (objc-get-class-list classes class-count)))
+	(map (lambda (class-idx)
+	       (pointer+ classes (* objc-class-size class-idx)))
+	     (iota return-count))))))
 
-      (for-each (lambda (class)
-		  (print (class-get-name class)))
-		class-list)
-      (free classes))))
+(for-each 
+ (lambda (class)
+   (print (class-get-name class)))
+ (class-list))
 
 
 
