@@ -5,14 +5,14 @@
 
 (use extras lolevel srfi-1)
 
-(define-foreign-type objc-class (c-pointer "struct objc_class"))
+(define-foreign-type objc-class (c-pointer "Class"))
 (define objc-class-size
   (foreign-value "sizeof(Class)" size_t))
 (define objc-get-class-list
-  (foreign-lambda int objc_getClassList (c-pointer objc-class) int))
+  (foreign-lambda int objc_getClassList objc-class int))
 
 (define class-get-name
-  (foreign-lambda* c-string (((c-pointer "Class") clazz))
+  (foreign-lambda* c-string ((objc-class clazz))
     "C_return(class_getName(*clazz));"))
 
 
