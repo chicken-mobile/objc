@@ -35,6 +35,12 @@
 (define method-get-name
   (foreign-lambda* objc-selector ((objc-method method))
     "C_return(method_getName(*method));"))
+(define method-get-number-of-arguments
+  (foreign-lambda* int ((objc-method method))
+    "C_return(method_getNumberOfArguments(*method));"))
+(define method-copy-argument-type
+  (foreign-lambda* c-string ((objc-method method) (unsigned-int i))
+    "C_return(method_copyArgumentType(*method, i));"))
 
 
 (define selector-get-name
@@ -56,8 +62,14 @@
 	       (iota return-count)))))))
 
 (map (lambda (method)
-       (let ((testo (method-get-name method)))
-	 (pp (selector-get-name testo))))
+       (let ((selector (method-get-name method))
+	     (arg-count (method-get-number-of-arguments method)))
+	 (pp (selector-get-name selector))
+	 (let loop ((i 0))
+	   (unless (= i arg-count)
+	     (pp (method-copy-argument-type method i))
+	     (loop (+ i 1))))
+	 (print "-----")))
      (let ((NSString (objc-get-class "NSString")))
        (let-location ((return-count unsigned-int))
 	 (let ((methods (class-copy-method-list NSString (location return-count))))
