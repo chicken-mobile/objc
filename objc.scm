@@ -221,26 +221,37 @@
        `(,%class-get-instance-method (,%class ,class-name) (,%selector ,selector-name))))))
 
 
-(define-syntax objc-class-lambda
+(define-syntax objc-lambda
   (er-macro-transformer
    (lambda (x r c)
-     (let ((class-name (cadr x))
-	   (selector-name (caddr x))
-	   
-	   (%let (r 'let))
-	   (%class (r 'class))
-	   (%selector (r 'selector))
-	   (%object-get-class (r 'object-get-class))
-	   (%class-get-method-imp (r 'class-get-method-imp))
-	   (%foreign-lambda* (r 'foreign-lambda*))
-	   (%lambda (r 'lambda)))
+     (let ((return-type (cadr x))
+	   (class-name (caddr x))
+	   (selector-map (cdddr x)))
+       `(let* ((sel (selector* ,(symbol->string (car selector-map))))
+	       (objc-class (class ,class-name))
+	       (imp  (method-get-implementation (class-get-instance-method objc-class sel)))
+	       (proc (dyncall-lambda ,return-type imp c-pointer c-pointer)))
+	  (lambda (x)
+	    (make-objc-object (proc (objc-record->objc-ptr x) sel))))))))
 
-       `(,%let ((proc  (,%foreign-lambda* objc-object ((objc-imp imp) (objc-object clazz) (objc-selector sel) (c-string arg0))
-		         "C_return((id*)((IMP)*imp)(*clazz, *sel, arg0));"))
-		(clazz (,%class ,class-name))
-		(sel   (,%selector ,selector-name)))
-
-	  (,%let ((imp (,%class-get-method-imp (,%object-get-class clazz) sel)))
-	    (,%lambda (arg0)
-	      (proc imp clazz sel arg0))))))))
+(define-syntax objc-lambda*
+  (er-macro-transformer
+   (lambda (x r c)
+     (let ((return-type (cadr x))
+	   (class-name (caddr x))
+	   (selector-map (cdddr x)))
+       (let ((arg-types '())
+	     (arg-names '()))
+	 `(let* ((sel (selector* ,(symbol->string (car selector-map))))
+		 (objc-class (class ,class-name))
+		 (meta-class (class-get-meta-class objc-class))		 
+		 (m (class-get-class-method objc-class sel))
+		 (imp  (method-get-implementation m))
+		 (proc (dyncall-lambda ,return-type imp c-pointer c-pointer ,@arg-types)))
+	    (object-dispose objc-class)
+	    (object-dispose m)
+	    (lambda ,arg-names
+	      ,(if (eq? return-type 'objc-object)
+		   `(set-finalizer! (proc (objc-record->objc-ptr meta-class) sel ,@arg-names) object-dispose)
+		   `(make-objc-object (proc (objc-record->objc-ptr meta-class) sel ,@arg-names))))))))))
 )
