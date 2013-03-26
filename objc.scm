@@ -7,7 +7,7 @@
 (module objc
 	*
 (import scheme chicken foreign)
-(use lolevel)
+(use lolevel dyncall)
 
 (define (objc-record->objc-ptr x)
   (record-instance-slot x 0))
