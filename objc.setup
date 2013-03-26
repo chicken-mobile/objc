@@ -1,0 +1,6 @@
+(compile -objc -lgnustep-base -lobjc -J objc.scm)
+(compile -s objc.import.scm)
+
+(install-extension 'objc
+  '("objc.so" "objc.import.so")
+  '((version "0.1")))

@@ -1,0 +1,4 @@
+((license "BSD License")
+ (category lang-exts)
+ (author "bevuta IT GmbH (Patrick Brauer)")
+ (synopsis "Objective C Bindings for Chicken Scheme"))
