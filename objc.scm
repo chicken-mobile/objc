@@ -7,12 +7,52 @@
 (module objc
 	*
 (import scheme chicken foreign)
+(use lolevel)
+
+(define (objc-record->objc-ptr x)
+  (record-instance-slot x 0))
+(define (print-objc-record out name class-name address)
+  (fprintf out "#<~A [~A] 0x~x>" name class-name address))
+
+(define-record objc-object pointer)
+(define-record-printer (objc-object x out)
+  (let ((ptr (objc-record->objc-ptr x)))
+    (print-objc-record out (record-instance-type x) (object-get-class-name* ptr) (pointer->address ptr))))
+
+(define-foreign-type objc-object   (c-pointer "id")
+  objc-record->objc-ptr make-objc-object)
+
+
+
+(define-record objc-class  pointer)
+(define-record-printer (objc-class x out)
+  (let ((ptr (objc-record->objc-ptr x)))
+    (print-objc-record out (record-instance-type x) (object-get-class-name* ptr) (pointer->address ptr))))
+
+(define-foreign-type objc-class   (c-pointer "Class")
+  objc-record->objc-ptr make-objc-class)
+
+
+(define-record objc-meta-class pointer)
+(define-record-printer (objc-meta-class x out)
+  (let ((ptr (objc-record->objc-ptr x)))
+    (print-objc-record out (record-instance-type x) "MetaClass" (pointer->address ptr))))
+(define-foreign-type objc-meta-class    (c-pointer "Class")
+  objc-record->objc-ptr make-objc-meta-class)
+
+
+(define-record objc-method  pointer)
+(define-record-printer (objc-method x out)
+  (let ((ptr (objc-record->objc-ptr x)))
+    (print-objc-record out (record-instance-type x) (selector-get-name (method-get-name* ptr)) (pointer->address ptr))))
+
+(define-foreign-type objc-method   (c-pointer "Method")
+  objc-record->objc-ptr make-objc-method)
+
+
 
 ;; typedefs
-(define-foreign-type objc-object   (c-pointer "id"))
 (define-foreign-type objc-selector (c-pointer "SEL"))
-(define-foreign-type objc-class    (c-pointer "Class"))
-(define-foreign-type objc-method   (c-pointer "Method"))
 (define-foreign-type objc-imp      c-pointer)
 
 
@@ -27,6 +67,9 @@
 
 
 ;; classes
+(define class-get-name*
+  (foreign-lambda* c-string (((c-pointer c-pointer) clazz))
+    "C_return(class_getName(*clazz));"))
 (define class-get-name
   (foreign-lambda* c-string ((objc-class clazz))
     "C_return(class_getName(*clazz));"))
@@ -54,6 +97,17 @@
     "IMP  foo = class_getMethodImplementation(*clazz, *selector);
      IMP* bar = &foo;
      C_return(bar);"))
+(define class-get-meta-class
+  (foreign-lambda* objc-meta-class ((objc-class object))
+    "Class  foo = object_getClass(*object);
+     Class* bar = &foo;
+     C_return(bar);"))
+(define class-get-meta-class*
+  (foreign-lambda* (c-pointer "Class") (((c-pointer "Class") object))
+    "Class  foo = object_getClass(*object);
+     Class* bar = &foo;
+     C_return(bar);"))
+
 
 ;; objects 
 (define object-get-class
@@ -61,16 +115,28 @@
     "Class  foo = object_getClass(*object);
      Class* bar = &foo;
      C_return(bar);"))
+
 (define object-set-class
   (foreign-lambda* objc-class ((objc-object object) (objc-class clazz))
     "C_return(object_setClass(*object, *clazz));"))
+(define object-get-class-name*
+  (foreign-lambda* c-string (((c-pointer c-pointer) o))
+    "C_return(object_getClassName(*o));"))
 (define object-get-class-name
   (foreign-lambda* c-string ((objc-object o))
     "C_return(object_getClassName(*o));"))
+(define object-dispose
+  (foreign-lambda* void ((objc-object o))
+    "C_return(object_dispose(*o));"))
 
 ;; methods
 (define method-get-name
   (foreign-lambda* objc-selector ((objc-method method))
+    "SEL  foo = method_getName(*method);
+     SEL* bar = &foo;
+     C_return(bar);"))
+(define method-get-name*
+  (foreign-lambda* objc-selector (((c-pointer "Method") method))
     "SEL  foo = method_getName(*method);
      SEL* bar = &foo;
      C_return(bar);"))
@@ -108,7 +174,7 @@
 
 (define bar
   (foreign-lambda* objc-object ((c-string string))
-    "NSString* foo = [NSString stringWithUTF8String: string];     
+    "NSString* foo = [NSString stringWithUTF8String: string];
      C_return(&foo);"))
 
 ;;;;
