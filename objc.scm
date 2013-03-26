@@ -14,21 +14,19 @@
 (define (print-objc-record out name class-name address)
   (fprintf out "#<~A [~A] 0x~x>" name class-name address))
 
+
 (define-record objc-object pointer)
 (define-record-printer (objc-object x out)
   (let ((ptr (objc-record->objc-ptr x)))
     (print-objc-record out (record-instance-type x) (object-get-class-name* ptr) (pointer->address ptr))))
-
 (define-foreign-type objc-object   (c-pointer "id")
   objc-record->objc-ptr make-objc-object)
-
 
 
 (define-record objc-class  pointer)
 (define-record-printer (objc-class x out)
   (let ((ptr (objc-record->objc-ptr x)))
     (print-objc-record out (record-instance-type x) (object-get-class-name* ptr) (pointer->address ptr))))
-
 (define-foreign-type objc-class   (c-pointer "Class")
   objc-record->objc-ptr make-objc-class)
 
@@ -45,7 +43,6 @@
 (define-record-printer (objc-method x out)
   (let ((ptr (objc-record->objc-ptr x)))
     (print-objc-record out (record-instance-type x) (selector-get-name (method-get-name* ptr)) (pointer->address ptr))))
-
 (define-foreign-type objc-method   (c-pointer "Method")
   objc-record->objc-ptr make-objc-method)
 
@@ -172,7 +169,7 @@
 ;; (define objc-get-class-list
 ;;   (foreign-lambda int objc_getClassList scheme-pointer int))
 
-(define bar
+(define ns-string
   (foreign-lambda* objc-object ((c-string string))
     "NSString* foo = [NSString stringWithUTF8String: string];
      C_return(&foo);"))
@@ -190,9 +187,12 @@
        `(,%sel->objc-selector (,%foreign-value ,(format "@selector(~A)" selector-name) objc-selector))))))
 
 (define selector*
-  (foreign-lambda* objc-selector ((objc-object name))
-    "SEL  foo = NSSelectorFromString(*name);
+  (foreign-lambda* objc-selector ((c-string name))    
+    "// NSString* baz = [[NSString alloc] initWithUTF8String: name]; :((((
+     NSString* baz = [NSString stringWithUTF8String: name];
+     SEL  foo = NSSelectorFromString(baz);
      SEL* bar = &foo;
+     // [baz retain];
      C_return(bar);"))
 
 (define-syntax class
