@@ -1,8 +1,4 @@
-(load "objc")
-(import objc)
-
-(import-for-syntax objc)
-(use expand-full trace)
+(use expand-full trace objc)
 
 (trace-module 'objc)
 (untrace objc-class-pointer class-get-name* object-get-class-name make-objc-meta-class
