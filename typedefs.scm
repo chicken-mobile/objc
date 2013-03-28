@@ -13,12 +13,10 @@
 	    (record-print-proc (if (>= (length x) 3)
 				   (caddr x)
 				   (symbol-append type-name '-name)))
-	    (real-type-name (if (= (length x) 4)
-				(cadddr x) type-name))
-
-	    (make-record-proc (symbol-append 'make-objc- type-name))
+	    (c-type (if (= (length x) 4)
+			(cadddr x) (symbol-append 'objc_ type-name)))
 	    (s-type (symbol-append 'objc- type-name))
-	    (c-type (symbol-append 'objc_ real-type-name)))
+	    (make-record-proc (symbol-append 'make-objc- type-name)))
 
        (let ((%define-record         (r 'define-record))
 	     (%define-record-printer (r 'define-record-printer))
@@ -35,9 +33,10 @@
 
 (define-objc-type ivar)
 (define-objc-type property)
+(define-objc-type protocol protocol-name Protocol)
 (define-objc-type object object-class-name)
 (define-objc-type class)
-(define-objc-type meta-class class-name class)
+(define-objc-type meta-class class-name obj_class)
 (define-objc-type selector)
 (define-objc-type method (compose selector-name method-name))
 

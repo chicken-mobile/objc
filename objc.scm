@@ -26,6 +26,8 @@
   (foreign-lambda void objc_registerClassPair objc-class))
 (define objc-dispose-class-pair
   (foreign-lambda void objc_disposeClassPair objc-class))
+(define objc-protocol
+  (foreign-lambda objc-protocol objc_getProtocol c-string))
 
 
 (define selector-name
@@ -91,6 +93,10 @@
   (foreign-lambda bool class_addIvar objc-class c-string size_t unsigned-int c-string))
 (define class-property
   (foreign-lambda objc-property class_getProperty objc-class c-string))
+(define class-add-protocol
+  (foreign-lambda bool class_addProtocol objc-class objc-protocol))
+(define class-conforms-to?
+  (foreign-lambda bool class_conformsToProtocol objc-class objc-protocol))
 
 (define meta-class-name
   (lambda args (print (cadr args))))
@@ -99,6 +105,15 @@
   (foreign-lambda c-string property_getName objc-property))
 (define property-attributes
   (foreign-lambda c-string property_getAttributes objc-property))
+
+(define protocol-conforms-to?
+  (foreign-lambda bool protocol_conformsToProtocol objc-protocol objc-protocol))
+(define protocol-equal?
+  (foreign-lambda bool protocol_isEqual objc-protocol objc-protocol))
+(define protocol-name
+  (foreign-lambda c-string protocol_getName objc-protocol))
+(define protocol-property
+  (foreign-lambda objc-property protocol_getProperty objc-protocol c-string bool bool))
 
 
 (define method-implementation
