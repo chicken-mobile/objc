@@ -30,18 +30,12 @@
   (foreign-lambda objc-protocol objc_getProtocol c-string))
 
 
+(define selector
+  (foreign-lambda objc-selector sel_registerName c-string))
 (define selector-name
   (foreign-lambda c-string sel_getName objc-selector))
-(define selector-register
-  (foreign-lambda objc-selector sel_registerName c-string))
 (define selector-equal?
   (foreign-lambda bool sel_isEqual objc-selector objc-selector))
-(define selector*
-  (foreign-lambda* objc-selector ((c-string name))    
-    "NSString* baz = [NSString stringWithUTF8String: name];
-     SEL  foo = NSSelectorFromString(baz);
-     [baz release];
-     C_return(foo);"))
 
 (define object-class
   (foreign-lambda objc-class object_getClass objc-class))
@@ -143,6 +137,8 @@
   (foreign-lambda objc-ivar class_getClassVariable objc-class c-string))
 (define class-ivar
   (foreign-lambda objc-ivar class_getInstanceVariable objc-class c-string))
+
+
 
 
 (include "macro-defs.scm"))
