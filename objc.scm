@@ -46,10 +46,14 @@
 (define-foreign-type objc-method   (c-pointer "Method")
   objc-record->objc-ptr make-objc-method)
 
+(define-record objc-selector pointer)
+(define-record-printer (objc-selector x out)
+  (let ((ptr (objc-record->objc-ptr x)))
+    (print-objc-record out (record-instance-type x) (selector-get-name* ptr) (pointer->address ptr))))
+(define-foreign-type objc-selector (c-pointer "SEL")
+  objc-record->objc-ptr make-objc-selector)
 
 
-;; typedefs
-(define-foreign-type objc-selector (c-pointer "SEL"))
 (define-foreign-type objc-imp      c-pointer)
 
 
@@ -165,6 +169,9 @@
     C_return(bar);"))
 (define selector-get-name
   (foreign-lambda* c-string ((objc-selector s))
+    "C_return(sel_getName(*s));"))
+(define selector-get-name*
+  (foreign-lambda* c-string (((c-pointer "SEL") s))
     "C_return(sel_getName(*s));"))
 
 ;; experimental
