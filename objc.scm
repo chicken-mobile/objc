@@ -252,7 +252,7 @@
 	       (imp  (method-get-implementation (class-get-instance-method objc-class sel)))
 	       (proc (dyncall-lambda ,return-type imp c-pointer c-pointer)))
 	  (lambda (x)
-	    (make-objc-object (proc (objc-record->objc-ptr x) sel))))))))
+	    (make-objc-object (proc (objc-record->objc-ptr x) (objc-record->objc-ptr sel)))))))))
 
 (define-syntax objc-lambda*
   (er-macro-transformer
