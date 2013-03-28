@@ -49,7 +49,17 @@
   (foreign-lambda objc-object object_copy objc-object size_t))
 (define object-dispose
   (foreign-lambda void object_dispose objc-object))
+(define object-ivar
+  (foreign-lambda objc-ivar object_getInstanceVariable objc-object c-string (c-pointer (c-pointer void))))
+(define object-ivar-set!
+  (foreign-lambda objc-ivar object_setInstanceVariable objc-object c-string (c-pointer void)))
+(define object-ivar-value
+  (foreign-lambda objc-object object_getIvar objc-object objc-ivar))
+(define object-ivar-value-set!
+  (foreign-lambda void object_setIvar objc-object objc-ivar objc-object))
 
+(define ivar-name
+  (foreign-lambda c-string ivar_getName objc-ivar))
 
 (define class-meta-class?
   (foreign-lambda bool objc_isMetaClass objc-class))
@@ -77,6 +87,8 @@
   (foreign-lambda bool class_addMethod objc-class objc-selector objc-imp c-string))
 (define class-replace-method
   (foreign-lambda bool class_addMethod objc-class objc-selector objc-imp c-string))
+(define class-add-ivar
+  (foreign-lambda bool class_addIvar objc-class c-string size_t unsigned-int c-string))
 
 (define meta-class-name
   (lambda args (print (cadr args))))
@@ -103,5 +115,12 @@
 
 (define method-name
   (foreign-lambda objc-selector method_getName objc-method))
+
+
+(define class-ivar*
+  (foreign-lambda objc-ivar class_getClassVariable objc-class c-string))
+(define class-ivar
+  (foreign-lambda objc-ivar class_getInstanceVariable objc-class c-string))
+
 
 (include "macro-defs.scm"))
