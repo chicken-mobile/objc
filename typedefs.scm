@@ -34,6 +34,7 @@
 
 
 (define-objc-type ivar)
+(define-objc-type property)
 (define-objc-type object object-class-name)
 (define-objc-type class)
 (define-objc-type meta-class class-name class)

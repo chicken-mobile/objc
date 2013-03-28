@@ -89,9 +89,16 @@
   (foreign-lambda bool class_addMethod objc-class objc-selector objc-imp c-string))
 (define class-add-ivar
   (foreign-lambda bool class_addIvar objc-class c-string size_t unsigned-int c-string))
+(define class-property
+  (foreign-lambda objc-property class_getProperty objc-class c-string))
 
 (define meta-class-name
   (lambda args (print (cadr args))))
+
+(define property-name
+  (foreign-lambda c-string property_getName objc-property))
+(define property-attributes
+  (foreign-lambda c-string property_getAttributes objc-property))
 
 
 (define method-implementation
