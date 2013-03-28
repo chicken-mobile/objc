@@ -1,18 +1,33 @@
-(use expand-full trace objc)
+(use expand-full trace objc dyncall srfi-18)
 
 (trace-module 'objc)
 (untrace objc-class-pointer class-get-name* object-get-class-name make-objc-meta-class
 	 objc-meta-class-pointer class-get-meta-class*
 	 objc-object-pointer object-get-class-name*
-	 objc-method-pointer method-get-name* selector-get-name
-	 objc-record->objc-ptr object-dispose print-objc-record)
+	 objc-method-pointer method-get-name*
+	 objc-selector-pointer selector-get-name*
+	 objc-record->objc-ptr print-objc-record object-dispose)
 
-(ppexpand* '(objc-lambda* c-pointer NSAutoreleasePool  alloc))
-(ppexpand* '(objc-lambda  c-pointer NSAutoreleasePool   init))
+;;(ppexpand* '(objc-lambda* c-pointer NSAutoreleasePool  alloc))
+;;(ppexpand* '(objc-lambda  c-pointer NSAutoreleasePool   init))
 
-(pp (object-get-class-name
-     ((objc-lambda c-pointer NSAutoreleasePool init)
-      ((objc-lambda* c-pointer NSAutoreleasePool alloc)))))
+
+
+(print "\n\n\n\n\n")
+(let loop ((foo (class NSString))
+	   (bar 1))
+  (print bar foo)
+  (loop  foo (+ bar 1)))
+
+
+(exit -1)
+(pp ((objc-lambda   c-pointer NSAutoreleasePool init) 
+     ((objc-lambda* c-pointer NSAutoreleasePool alloc))))
+
+
+(pp (release-pool-init ((objc-lambda* c-pointer NSAutoreleasePool alloc))))
+(pp (release-pool-init ((objc-lambda* c-pointer NSAutoreleasePool alloc))))
+
 
 
 ;; (method* NSString c-pointer alloc)
