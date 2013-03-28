@@ -61,7 +61,13 @@
     "Class  foo  = objc_getClass(class_name);
      Class* bar = &foo;
      C_return(bar);"))
-
+(define objc-get-meta-class
+  (foreign-lambda* objc-meta-class ((c-string class_name))
+    "Class  foo  = objc_getMetaClass(class_name);
+     C_return(&foo);"))
+(define meta-class?
+  (foreign-lambda* bool (((c-pointer "Class") clazz))
+    "C_return(objc_isMetaClass(*clazz));"))
 
 ;; classes
 (define class-get-name*
@@ -201,6 +207,13 @@
      (let ((class-name (symbol->string (cadr x)))
 	   (%objc-get-class (r 'objc-get-class)))
        `(,%objc-get-class ,class-name)))))
+(define-syntax meta-class
+  (er-macro-transformer
+   (lambda (x r c)
+     (let ((class-name (symbol->string (cadr x)))
+	   (%objc-get-meta-class (r 'objc-get-class)))
+       `(,%objc-get-meta-class ,class-name)))))
+
 (define-syntax class-method
   (er-macro-transformer
    (lambda (x r c)
