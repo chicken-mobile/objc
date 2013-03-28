@@ -75,7 +75,7 @@
 
 ;; classes
 (define class-get-name*
-  (foreign-lambda* c-string (((c-pointer c-pointer) clazz))
+  (foreign-lambda* c-string (((c-pointer "Class") clazz))
     "C_return(class_getName(*clazz));"))
 (define class-get-name
   (foreign-lambda* c-string ((objc-class clazz))
@@ -127,7 +127,7 @@
   (foreign-lambda* objc-class ((objc-object object) (objc-class clazz))
     "C_return(object_setClass(*object, *clazz));"))
 (define object-get-class-name*
-  (foreign-lambda* c-string (((c-pointer c-pointer) o))
+  (foreign-lambda* c-string (((c-pointer "id") o))
     "C_return(object_getClassName(*o));"))
 (define object-get-class-name
   (foreign-lambda* c-string ((objc-object o))
@@ -143,7 +143,7 @@
      SEL* bar = &foo;
      C_return(bar);"))
 (define method-get-name*
-  (foreign-lambda* objc-selector (((c-pointer "Method") method))
+  (foreign-lambda* (c-pointer "SEL") (((c-pointer "Method") method))
     "SEL  foo = method_getName(*method);
      SEL* bar = &foo;
      C_return(bar);"))
