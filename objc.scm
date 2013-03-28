@@ -31,7 +31,8 @@
 (define class-method
   (foreign-lambda objc-method class_getInstanceMethod objc-class objc-selector))
 
-
+(define meta-class-name
+  (lambda args (print (cadr args))))
 
 (define selector-name
   (foreign-lambda c-string sel_getName objc-selector))

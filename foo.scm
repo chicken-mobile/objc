@@ -2,7 +2,7 @@
 
 (trace-module 'objc)
 (untrace objc-class-pointer make-objc-class class-name
-	 objc-meta-class-pointer make-objc-meta-class 
+	 objc-meta-class-pointer make-objc-meta-class meta-class-name
 	 objc-object-pointer make-objc-object object-class-name
 	 objc-method-pointer make-objc-method method-name
 	 objc-selector-pointer make-objc-selector selector-name
