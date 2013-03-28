@@ -18,15 +18,20 @@
 	    (s-type (symbol-append 'objc- type-name))
 	    (make-record-proc (symbol-append 'make-objc- type-name)))
 
-       (let ((%define-record         (r 'define-record))
+       (let ((%begin                 (r 'begin))
+	     (%define-record         (r 'define-record))
 	     (%define-record-printer (r 'define-record-printer))
 	     (%print-objc-record     (r 'print-objc-record))
 	     (%define-foreign-type   (r 'define-foreign-type))
-	     (%objc-record->objc-ptr (r 'objc-record->objc-ptr)))
-	 `(begin
+	     (%objc-record->objc-ptr (r 'objc-record->objc-ptr))
+
+	     (%record (r 'record))
+	     (%out    (r 'out)))
+
+	 `(,%begin
 	    (,%define-record ,s-type pointer)
-	    (,%define-record-printer (,s-type x out)
-	      (,%print-objc-record out x ,record-print-proc))
+	    (,%define-record-printer (,s-type ,%record ,%out)
+	      (,%print-objc-record ,%out ,%record ,record-print-proc))
 	    (,%define-foreign-type ,s-type (c-pointer (struct ,c-type))
 	      ,%objc-record->objc-ptr ,make-record-proc)))))))
 
