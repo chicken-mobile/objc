@@ -130,30 +130,29 @@
   (foreign-lambda objc-property protocol_getProperty objc-protocol c-string bool bool))
 
 
-(define method-implementation
-  (foreign-lambda objc-imp method_getImplementation objc-method))
 (define method-implementation-set!
   (foreign-lambda objc-imp method_setImplementation objc-method objc-imp))
 (define method-exchange-implementations 
   (foreign-lambda void method_exchangeImplementations objc-method objc-method))
-(define method-argument-length
-  (foreign-lambda int method_getNumberOfArguments objc-method))
 
-(define method-copy-argument-type
-  (foreign-lambda c-string method_copyArgumentType objc-method unsigned-int))
-(define method-argument-type
-  (foreign-lambda void method_getArgumentType objc-method unsigned-int c-string size_t))
-
-(define method-copy-return-type
-  (foreign-lambda c-string method_copyReturnType objc-method))
-(define method-return-type
-  (foreign-lambda void method_getReturnType objc-method c-string size_t))
 ;; for some reason im not wise enough to know this works not like all the others
 ;; when dealing with methods that came from class-method-list which may loose type
 ;; information for the compiler but i cant think why whis could harm anything :S
 (define method-name
   (foreign-lambda* objc-selector ((objc-method m))
     "C_return(method_getName(*((Method*)m)));"))
+(define method-return-type
+  (foreign-lambda* c-string ((objc-method m))
+    "C_return(method_copyReturnType(*((Method*)m)));"))
+(define method-argument-length
+  (foreign-lambda* int ((objc-method m))
+    "C_return(method_getNumberOfArguments(*((Method*)m)));"))
+(define method-argument-type
+  (foreign-lambda* c-string ((objc-method m) (unsigned-int i))
+    "C_return(method_copyArgumentType(*((Method*)m), i));"))
+(define method-implementation
+  (foreign-lambda* objc-imp ((objc-method m))
+    "C_return(method_getImplementation(*((Method*)m)));"))
 
 
 (define class-ivar*
