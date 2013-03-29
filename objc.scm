@@ -54,7 +54,7 @@
 (define object-clone
   (foreign-lambda objc-object object_copy objc-object size_t))
 (define object-dispose
-  (foreign-lambda void object_dispose objc-object))
+  (foreign-lambda objc-object object_dispose objc-object))
 (define object-ivar
   (foreign-lambda objc-ivar object_getInstanceVariable objc-object c-string (c-pointer (c-pointer void))))
 (define object-ivar-set!
