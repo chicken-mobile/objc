@@ -22,7 +22,9 @@
 	       (imp (class-method-imp objc-class sel))
 	       (proc (dyncall-lambda ,return-type imp c-pointer c-pointer)))
 	  (lambda (x)
-	    (make-objc-object (proc (objc-record->objc-ptr x) (objc-record->objc-ptr sel)))))))))
+	    ,(if (eq? return-type 'c-pointer)
+		 `(make-objc-object (proc (objc-record->objc-ptr x) (objc-record->objc-ptr sel)))
+		 `(proc (objc-record->objc-ptr x) (objc-record->objc-ptr sel)))))))))
 
 (define-syntax objc-lambda*
   (er-macro-transformer
@@ -38,4 +40,6 @@
 		 (imp (class-method-imp mc sel))
 		 (proc (dyncall-lambda ,return-type imp c-pointer c-pointer ,@arg-types)))
 	    (lambda ,arg-names
-	      (make-objc-object (proc (objc-record->objc-ptr c) (objc-record->objc-ptr sel) ,@arg-names)))))))))
+	      ,(if (eq? return-type 'c-pointer)
+		   `(make-objc-object (proc (objc-record->objc-ptr c) (objc-record->objc-ptr sel) ,@arg-names))
+		   `(proc (objc-record->objc-ptr c) (objc-record->objc-ptr sel) ,@arg-names)))))))))
