@@ -7,7 +7,7 @@
 (module objc
 *
 (import scheme chicken data-structures foreign)
-(use lolevel dyncall)
+(use srfi-1 lolevel dyncall)
 
 (include "typedefs.scm")
 
@@ -28,7 +28,17 @@
   (foreign-lambda void objc_disposeClassPair objc-class))
 (define objc-protocol
   (foreign-lambda objc-protocol objc_getProtocol c-string))
-
+(define objc-class-list*
+  (foreign-lambda int objc_getClassList pointer-vector int))
+(define (objc-class-count)
+  (objc-class-list* #f 0))
+(define (objc-class-list)
+  (let* ((class-count (objc-class-count))
+         (array (make-pointer-vector class-count))
+	 (return-count (objc-class-list* array class-count)))
+    (map (lambda (i)
+	   (set-finalizer! (make-objc-class (pointer-vector-ref array i)) object-dispose))
+	 (iota return-count))))
 
 (define selector
   (foreign-lambda objc-selector sel_registerName c-string))
@@ -91,6 +101,16 @@
   (foreign-lambda bool class_addProtocol objc-class objc-protocol))
 (define class-conforms-to?
   (foreign-lambda bool class_conformsToProtocol objc-class objc-protocol))
+(define class-method-list*
+  (foreign-lambda (c-pointer "struct objc_method") class_copyMethodList  objc-class (c-pointer unsigned-int)))
+(define (class-method-list objc-class)
+  (let ((method-type-size (foreign-value "sizeof(Method)" size_t)))
+    (let-location ((return-count unsigned-int 0))
+      (let ((array (set-finalizer! (class-method-list* objc-class (location return-count)) object-dispose)))
+	(map (lambda (i)
+	       (make-objc-method (tag-pointer (pointer+ array (* i method-type-size)) array)))
+	     (iota return-count))))))
+
 
 (define meta-class-name
   (lambda args (print (cadr args))))
@@ -128,9 +148,12 @@
   (foreign-lambda c-string method_copyReturnType objc-method))
 (define method-return-type
   (foreign-lambda void method_getReturnType objc-method c-string size_t))
-
+;; for some reason im not wise enough to know this works not like all the others
+;; when dealing with methods that came from class-method-list which may loose type
+;; information for the compiler but i cant think why whis could harm anything :S
 (define method-name
-  (foreign-lambda objc-selector method_getName objc-method))
+  (foreign-lambda* objc-selector ((objc-method m))
+    "C_return(method_getName(*((Method*)m)));"))
 
 
 (define class-ivar*
