@@ -28,10 +28,19 @@
   (pp arg-length)
   (pp arg-types))
 
+(ppexpand* '(objc-lambda* c-pointer NSAutoreleasePool alloc))
 
 
+(let ((bar (selector* "init"))
+      (baz (objc-class "NSAutoreleasePool")))
+  (pp bar)
+  (pp baz)
+  (pp (class-method-imp baz bar))
+  (pp (class-method baz bar))
+  (pp (selector-name (method-name (class-method baz bar))))
+)
 
-(exit -1)
+
 
 (define arp-alloc 
   (objc-lambda* c-pointer NSAutoreleasePool alloc))

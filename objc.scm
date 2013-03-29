@@ -43,7 +43,8 @@
 (define selector*
   (foreign-lambda objc-selector sel_registerName c-string))
 (define selector-name
-  (foreign-lambda c-string sel_getName objc-selector))
+  (foreign-lambda* c-string ((objc-selector sel))
+    "C_return((const struct objc_selector*)sel_getName(sel));"))
 (define selector-equal?
   (foreign-lambda bool sel_isEqual objc-selector objc-selector))
 
@@ -140,7 +141,7 @@
 ;; information for the compiler but i cant think why whis could harm anything :S
 (define method-name
   (foreign-lambda* objc-selector ((objc-method m))
-    "C_return(method_getName(*((Method*)m)));"))
+    "C_return(((struct objc_selector*)method_getName(m)));"))
 (define method-return-type
   (foreign-lambda* c-string ((objc-method m))
     "C_return(method_copyReturnType(*((Method*)m)));"))
