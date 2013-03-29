@@ -17,7 +17,7 @@
      (let ((return-type (cadr x))
 	   (class-name (caddr x))
 	   (selector-map (cdddr x)))
-       `(let* ((sel (selector ,(symbol->string (car selector-map))))
+       `(let* ((sel (selector ,(car selector-map)))
 	       (objc-class (class ,class-name))
 	       (imp (class-method-imp objc-class sel))
 	       (proc (dyncall-lambda ,return-type imp c-pointer c-pointer)))
@@ -34,7 +34,7 @@
 	   (selector-map (cdddr x)))
        (let ((arg-types '())
 	     (arg-names '()))
-	 `(let* ((sel (selector ,(symbol->string (car selector-map))))
+	 `(let* ((sel (selector ,(car selector-map)))
 		 (c (class ,class-name))
 		 (mc (meta-class ,class-name))
 		 (imp (class-method-imp mc sel))
@@ -43,3 +43,13 @@
 	      ,(if (eq? return-type 'c-pointer)
 		   `(make-objc-object (proc (objc-record->objc-ptr c) (objc-record->objc-ptr sel) ,@arg-names))
 		   `(proc (objc-record->objc-ptr c) (objc-record->objc-ptr sel) ,@arg-names)))))))))
+
+(define-syntax selector
+  (er-macro-transformer
+   (lambda (x r c)
+     (let* ((selector-symbol (cadr x))
+	    (selector-symbol (if (string? selector-symbol)
+				selector-symbol
+				(symbol->string selector-symbol)))
+	    (%selector* (r 'selector*)))
+       `(,%selector* ,selector-symbol)))))

@@ -40,7 +40,7 @@
 	   (make-objc-class (tag-pointer (pointer-vector-ref array i) array)))
 	 (iota return-count))))
 
-(define selector
+(define selector*
   (foreign-lambda objc-selector sel_registerName c-string))
 (define selector-name
   (foreign-lambda c-string sel_getName objc-selector))
