@@ -104,9 +104,9 @@
 (define class-method-list*
   (foreign-lambda (c-pointer "struct objc_method") class_copyMethodList  objc-class (c-pointer unsigned-int)))
 (define (class-method-list objc-class)
-  (let ((method-type-size (foreign-value "sizeof(Method)" size_t)))
+  (let ((method-type-size (foreign-type-size "Method")))
     (let-location ((return-count unsigned-int 0))
-      (let ((array (set-finalizer! (class-method-list* objc-class (location return-count)) object-dispose)))
+      (let ((array (set-finalizer! (class-method-list* objc-class (location return-count)) free)))
 	(map (lambda (i)
 	       (make-objc-method (tag-pointer (pointer+ array (* i method-type-size)) array)))
 	     (iota return-count))))))
