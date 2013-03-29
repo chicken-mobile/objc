@@ -34,10 +34,10 @@
   (objc-class-list* #f 0))
 (define (objc-class-list)
   (let* ((class-count (objc-class-count))
-         (array (make-pointer-vector class-count))
+         (array (set-finalizer! (make-pointer-vector class-count) free))
 	 (return-count (objc-class-list* array class-count)))
     (map (lambda (i)
-	   (set-finalizer! (make-objc-class (pointer-vector-ref array i)) object-dispose))
+	   (make-objc-class (tag-pointer (pointer-vector-ref array i) array)))
 	 (iota return-count))))
 
 (define selector
