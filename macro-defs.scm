@@ -48,8 +48,9 @@
   (er-macro-transformer
    (lambda (x r c)
      (let* ((selector-symbol (cadr x))
-	    (selector-symbol (if (string? selector-symbol)
-				selector-symbol
-				(symbol->string selector-symbol)))
-	    (%selector* (r 'selector*)))
-       `(,%selector* ,selector-symbol)))))
+	    (%selector* (r 'selector*))
+	    (%symbol->string (r 'symbol->string)))       
+       `(,%selector* 
+	 ,(if (string? selector-symbol)
+	      selector-symbol
+	      `(,%symbol->string ,selector-symbol)))))))
