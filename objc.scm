@@ -43,8 +43,7 @@
 (define selector*
   (foreign-lambda objc-selector sel_registerName c-string))
 (define selector-name
-  (foreign-lambda* c-string ((objc-selector sel))
-    "C_return((const struct objc_selector*)sel_getName(sel));"))
+  (foreign-lambda c-string sel_getName objc-selector))
 (define selector-equal?
   (foreign-lambda bool sel_isEqual objc-selector objc-selector))
 
@@ -154,6 +153,9 @@
 (define method-implementation
   (foreign-lambda* objc-imp ((objc-method m))
     "C_return(method_getImplementation(*((Method*)m)));"))
+(define method-description
+  (foreign-lambda* objc-method-description ((objc-method m))
+    "C_return(((struct objc_method_description*)method_getDescription(*((Method*)m))));"))
 
 
 (define class-ivar*
