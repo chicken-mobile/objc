@@ -53,4 +53,4 @@
        `(,%selector* 
 	 ,(if (string? selector-symbol)
 	      selector-symbol
-	      `(,%symbol->string ,selector-symbol)))))))
+	      `(,%symbol->string (quote ,selector-symbol))))))))
