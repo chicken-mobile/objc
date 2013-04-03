@@ -55,7 +55,7 @@
 (define-foreign-type objc-imp c-pointer)
 
 
-(define-foreign-enum-type (type-char char)
+(define-foreign-enum-type (type-char integer)
   (type-char->char char->type-char)
 
   ((void type-char/void) _C_VOID)
@@ -102,8 +102,8 @@
   ((objc-one-way  type-char/objc-one-way) _C_ONEWAY)
   ((objc-gc-invisible type-char/gc-invisible) _C_GCINVISIBLE))
 
-(define-foreign-record-type (method-description "struct objc_method_description")
+(define-foreign-record-type (objc-method-description "struct objc_method_description")
   (constructor: make-method-description)
   (destructor:  free-method-description)
-  (objc-selector name  method-description-sel   method-description-sel-set!)
-  (c-string      types method-description-types method-description-types-set!))
+  (objc-selector name  method-description-selector method-description-sel-set!)
+  (c-string      types method-description-types    method-description-types-set!))
