@@ -105,7 +105,7 @@
   (foreign-lambda c-pointer class_copyMethodList  objc-class (c-pointer unsigned-int)))
 (define class-method-list-method
   (foreign-lambda* objc-method ((c-pointer x) (unsigned-int i)) 
-    "C_return(*(((Method*)x) + (sizeof(Method) * i)));"))
+    "C_return(*(((Method*)x) + i));"))
 (define (class-method-list objc-class)
   (let-location ((return-count unsigned-int 0))
     (let ((method-list (class-method-list* objc-class (location return-count))))
