@@ -52,6 +52,7 @@
 (define-objc-type meta-class class-name obj_class)
 (define-objc-type selector)
 (define-objc-type method (compose selector-name method-name))
+(define-objc-type method-description method-description-name objc_method_description)
 (define-foreign-type objc-imp c-pointer)
 
 
@@ -101,9 +102,3 @@
   ((objc-by-ref   type-char/objc-by-ref) _C_BYREF)
   ((objc-one-way  type-char/objc-one-way) _C_ONEWAY)
   ((objc-gc-invisible type-char/gc-invisible) _C_GCINVISIBLE))
-
-(define-foreign-record-type (objc-method-description "struct objc_method_description")
-  (constructor: make-method-description)
-  (destructor:  free-method-description)
-  (objc-selector name  method-description-selector method-description-sel-set!)
-  (c-string      types method-description-types    method-description-types-set!))

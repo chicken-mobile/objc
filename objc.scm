@@ -102,14 +102,16 @@
 (define class-conforms-to?
   (foreign-lambda bool class_conformsToProtocol objc-class objc-protocol))
 (define class-method-list*
-  (foreign-lambda (c-pointer "struct objc_method") class_copyMethodList  objc-class (c-pointer unsigned-int)))
+  (foreign-lambda c-pointer class_copyMethodList  objc-class (c-pointer unsigned-int)))
+(define class-method-list-method
+  (foreign-lambda* objc-method ((c-pointer x) (unsigned-int i)) 
+    "C_return(*(((Method*)x) + (sizeof(Method) * i)));"))
 (define (class-method-list objc-class)
-  (let ((method-type-size (foreign-type-size "Method")))
-    (let-location ((return-count unsigned-int 0))
-      (let ((array (set-finalizer! (class-method-list* objc-class (location return-count)) free)))
-	(map (lambda (i)
-	       (make-objc-method (tag-pointer (pointer+ array (* i method-type-size)) array)))
-	     (iota return-count))))))
+  (let-location ((return-count unsigned-int 0))
+    (let ((method-list (class-method-list* objc-class (location return-count))))
+      (map (lambda (i)
+	     (class-method-list-method method-list i))
+	   (iota return-count)))))
 
 
 (define meta-class-name
@@ -134,28 +136,28 @@
   (foreign-lambda objc-imp method_setImplementation objc-method objc-imp))
 (define method-exchange-implementations 
   (foreign-lambda void method_exchangeImplementations objc-method objc-method))
-
-;; for some reason im not wise enough to know this works not like all the others
-;; when dealing with methods that came from class-method-list which may loose type
-;; information for the compiler but i cant think why whis could harm anything :S
 (define method-name
-  (foreign-lambda* objc-selector ((objc-method m))
-    "C_return(((struct objc_selector*)method_getName(m)));"))
+  (foreign-lambda objc-selector method_getName objc-method))
 (define method-return-type
-  (foreign-lambda* c-string ((objc-method m))
-    "C_return(method_copyReturnType(*((Method*)m)));"))
+  (foreign-lambda c-string method_copyReturnType objc-method))
 (define method-argument-length
-  (foreign-lambda* int ((objc-method m))
-    "C_return(method_getNumberOfArguments(*((Method*)m)));"))
+  (foreign-lambda int method_getNumberOfArguments objc-method))
 (define method-argument-type
-  (foreign-lambda* c-string ((objc-method m) (unsigned-int i))
-    "C_return(method_copyArgumentType(*((Method*)m), i));"))
+  (foreign-lambda c-string method_copyArgumentType objc-method unsigned-int))
 (define method-implementation
-  (foreign-lambda* objc-imp ((objc-method m))
-    "C_return(method_getImplementation(*((Method*)m)));"))
+  (foreign-lambda objc-imp method_getImplementation objc-method ))
 (define method-description
-  (foreign-lambda* objc-method-description ((objc-method m))
-    "C_return(((struct objc_method_description*)method_getDescription(*((Method*)m))));"))
+  (foreign-lambda objc-method-description method_getDescription objc-method))
+
+
+(define method-description-selector
+  (foreign-lambda* objc-selector ((objc-method-description md))
+    "C_return((*md).name);"))
+(define method-description-types
+  (foreign-lambda* objc-selector ((objc-method-description md))
+    "C_return((*md).types);"))
+(define (method-description-name objc-method-description)
+  (format "~A" (selector-name (method-description-selector objc-method-description))))
 
 
 (define class-ivar*
