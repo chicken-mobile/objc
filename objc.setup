@@ -1,4 +1,4 @@
-(compile -s -objc -lgnustep-base -lobjc -J objc.scm)
+(compile -s -objc -I/usr/include/GNUstep -lgnustep-base -lobjc -J objc.scm -C -D_NATIVE_OBJC_EXCEPTIONS)
 (compile -s objc.import.scm)
 
 (install-extension 'objc
