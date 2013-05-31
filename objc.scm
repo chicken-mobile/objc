@@ -1,171 +1,424 @@
+;;;; main interface
+
+
+(import foreign)
+(use lolevel data-structures ports)
+
+(begin-for-syntax
+ (require-library objc-compile-time))
+(import-for-syntax objc-compile-time)
+
+(import-for-syntax chicken matchable fmt)
+
+(include "objc-syntax.scm")
+
+#;(define-syntax d
+  (syntax-rules ()
+    ((_ args ...)
+     (with-output-to-port (current-error-port)
+       (lambda () (print args ...))))))
+
+(define-syntax d
+  (syntax-rules () ((_ args ...) (void))))
+
+;(declare (unsafe))
+
+(import bind)
+(use lolevel)
+
+
 #>
+#ifdef __GNUSTEP__
+# define _NATIVE_OBJC_ECXEPTIONS
+#endif
+
+#include <dyncall.h>
 #include <objc/objc.h>
 #include <objc/runtime.h>
+#include <objc/message.h>
 #import <Foundation/Foundation.h>
+#import <Foundation/NSString.h>
+#import <Foundation/NSObject.h>
 <#
 
-(module objc
-*
-(import scheme chicken data-structures foreign)
-(use srfi-1 lolevel dyncall)
+(bind #<<EOF
 
-(include "typedefs.scm")
+void dcFree(DCCallVM *);
 
+void dcArgBool(DCCallVM *, int);
+void dcArgChar(DCCallVM *, char);
+void dcArgShort(DCCallVM *, short);
+void dcArgInt(DCCallVM *, int);
+void dcArgLong(DCCallVM *, long);
+void dcArgLongLong(DCCallVM *, ___number);
+void dcArgFloat(DCCallVM *, float);
+void dcArgDouble(DCCallVM *, double);
+void dcArgPointer(DCCallVM *, void *);
 
-(define objc-class
-  (foreign-lambda objc-class objc_getClass c-string))
-(define objc-lookup-class
-  (foreign-lambda objc-class objc_lookUpClass c-string))
-(define objc-required-class
-  (foreign-lambda objc-class objc_getRequiredClass c-string))
-(define objc-meta-class
-  (foreign-lambda objc-meta-class objc_getMetaClass c-string))
-(define objc-allocate-class-pair
-  (foreign-lambda objc-class objc_allocateClassPair objc-class c-string size_t))
-(define objc-register-class-pair
-  (foreign-lambda void objc_registerClassPair objc-class))
-(define objc-dispose-class-pair
-  (foreign-lambda void objc_disposeClassPair objc-class))
-(define objc-protocol
-  (foreign-lambda objc-protocol objc_getProtocol c-string))
-(define objc-class-list*
-  (foreign-lambda int objc_getClassList pointer-vector int))
-(define (objc-class-count)
-  (objc-class-list* #f 0))
-(define (objc-class-list)
-  (let* ((class-count (objc-class-count))
-         (array (set-finalizer! (make-pointer-vector class-count) free))
-	 (return-count (objc-class-list* array class-count)))
-    (map (lambda (i)
-	   (make-objc-class (tag-pointer (pointer-vector-ref array i) array)))
-	 (iota return-count))))
+___safe void dcCallVoid(DCCallVM *, void *);
+___safe int dcCallBool(DCCallVM *, void *);
+___safe char dcCallChar(DCCallVM *, void *);
+___safe short dcCallShort(DCCallVM *, void *);
+___safe int dcCallInt(DCCallVM *, void *);
+___safe long dcCallLong(DCCallVM *, void *);
+___safe ___number dcCallLongLong(DCCallVM *, void *);
+___safe float dcCallFloat(DCCallVM *, void *);
+___safe double dcCallDouble(DCCallVM *, void *);
+___safe void *dcCallPointer(DCCallVM *, void *);
 
-(define selector*
-  (foreign-lambda objc-selector sel_registerName c-string))
-(define selector-name
-  (foreign-lambda c-string sel_getName objc-selector))
-(define selector-equal?
-  (foreign-lambda bool sel_isEqual objc-selector objc-selector))
+void *sel_registerName(char *);
+char *sel_getName(void *);
+char *object_getClassName(void *);
+void *object_getClass(void *);
+void *objc_msg_lookup(void *, void *);
+void *class_getInstanceMethod(void *, void *);
+void *objc_getClass(char *);
+char *class_getName(void *);
+void *class_getSuperclass(void *);
 
-(define object-class
-  (foreign-lambda objc-class object_getClass objc-class))
-(define object-class-name
-  (foreign-lambda c-string object_getClassName objc-object))
-(define object-clone
-  (foreign-lambda objc-object object_copy objc-object size_t))
-(define object-dispose
-  (foreign-lambda objc-object object_dispose objc-object))
-(define object-ivar
-  (foreign-lambda objc-ivar object_getInstanceVariable objc-object c-string (c-pointer (c-pointer void))))
-(define object-ivar-set!
-  (foreign-lambda objc-ivar object_setInstanceVariable objc-object c-string (c-pointer void)))
-(define object-ivar-value
-  (foreign-lambda objc-object object_getIvar objc-object objc-ivar))
-(define object-ivar-value-set!
-  (foreign-lambda void object_setIvar objc-object objc-ivar objc-object))
+void *object_getInstanceVariable(void *, char *, void *);
+char *ivar_getTypeEncoding(void *);
+int ivar_getOffset(void *);
+___bool class_isMetaClass(void *);
 
-(define ivar-name
-  (foreign-lambda c-string ivar_getName objc-ivar))
+EOF
+)
 
-(define class-meta-class?
-  (foreign-lambda bool objc_isMetaClass objc-class))
-(define class-super-class
-  (foreign-lambda objc-class class_getSuperclass objc-class))
-(define class-version
-  (foreign-lambda int class_getVersion objc-class))
-(define class-version-set!
-  (foreign-lambda void class_setVersion objc-class int))
-(define class-instance-size
-  (foreign-lambda size_t class_getInstanceSize objc-class))
-(define class-method-imp
-  (foreign-lambda objc-imp class_getMethodImplementation objc-class objc-selector))
-(define class-name
-  (foreign-lambda c-string class_getName objc-class))
-(define class-create-instance
-  (foreign-lambda objc-object class_createInstance objc-class unsigned-int))
-(define class-method*
-  (foreign-lambda objc-method class_getClassMethod objc-class objc-selector))
-(define class-method
-  (foreign-lambda objc-method class_getInstanceMethod objc-class objc-selector))
-(define class-responds-to
-  (foreign-lambda bool class_respondeToSelector objc-class objc-selector))
-(define class-add-method
-  (foreign-lambda bool class_addMethod objc-class objc-selector objc-imp c-string))
-(define class-replace-method
-  (foreign-lambda bool class_addMethod objc-class objc-selector objc-imp c-string))
-(define class-add-ivar
-  (foreign-lambda bool class_addIvar objc-class c-string size_t unsigned-int c-string))
-(define class-property
-  (foreign-lambda objc-property class_getProperty objc-class c-string))
-(define class-add-protocol
-  (foreign-lambda bool class_addProtocol objc-class objc-protocol))
-(define class-conforms-to?
-  (foreign-lambda bool class_conformsToProtocol objc-class objc-protocol))
-(define class-method-list*
-  (foreign-lambda c-pointer class_copyMethodList  objc-class (c-pointer unsigned-int)))
-(define class-method-list-method
-  (foreign-lambda* objc-method ((c-pointer x) (unsigned-int i)) 
-    "C_return(*(((Method*)x) + i));"))
-(define (class-method-list objc-class)
-  (let-location ((return-count unsigned-int 0))
-    (let ((method-list (class-method-list* objc-class (location return-count))))
-      (map (lambda (i)
-	     (class-method-list-method method-list i))
-	   (iota return-count)))))
+(bind* #<<EOF
+
+static char *get_method_description_types(void *mth) { return method_getDescription(mth)->types; }
+___safe static char *call_with_string_result(DCCallVM *vm, void *ptr) { return dcCallPointer(vm, ptr); }
+static void push_string_argument(DCCallVM *vm, char *ptr) { dcArgPointer(vm, ptr); }
+
+static DCCallVM *begin_call_setup() { 
+  DCCallVM *vm = dcNewCallVM(4096);
+  dcMode(vm, DC_CALL_C_DEFAULT);
+  dcReset(vm);
+  return vm;
+}
+
+static char ivar_char_ref(Ivar *v, void *obj, int off) { return *((char *)((char *)obj + off)); }
+static short ivar_short_ref(Ivar *v, void *obj, int off) { return *((short *)((char *)obj + off)); }
+static int ivar_int_ref(Ivar *v, void *obj, int off) { return *((int *)((char *)obj + off)); }
+static long ivar_long_ref(Ivar *v, void *obj, int off) { return *((long *)((char *)obj + off)); }
+static ___number ivar_longlong_ref(Ivar *v, void *obj, int off) { return *((long long *)((char *)obj + off)); }
+static void *ivar_ptr_ref(Ivar *v, void *obj, int off) { return *((void **)((char *)obj + off)); }
+static char *ivar_string_ref(Ivar *v, void *obj, int off) { return *((char **)((char *)obj + off)); }
+static float ivar_float_ref(Ivar *v, void *obj, int off) { return *((float *)((char *)obj + off)); }
+static double ivar_double_ref(Ivar *v, void *obj, int off) { return *((double *)((char *)obj + off)); }
+
+static void ivar_char_set(Ivar *v, void *obj, int off, char x) { *((char *)((char *)obj + off)) = x; }
+static void ivar_short_set(Ivar *v, void *obj, int off, short x) { *((short *)((char *)obj + off)) = x; }
+static void ivar_int_set(Ivar *v, void *obj, int off, int x) { *((int *)((char *)obj + off)) = x; }
+static void ivar_long_set(Ivar *v, void *obj, int off, long x) { *((long *)((char *)obj + off)) = x; }
+static void ivar_longlong_set(Ivar *v, void *obj, int off, ___number x) { *((long long *)((char *)obj + off)) = x; }
+static void ivar_ptr_set(Ivar *v, void *obj, int off, void *x) { *((void **)((char *)obj + off)) = x; }
+static void ivar_string_set(Ivar *v, void *obj, int off, char *x) { *((char **)((char *)obj + off)) = x; }
+static void ivar_float_set(Ivar *v, void *obj, int off, float x) { *((float *)((char *)obj + off)) = x; }
+static void ivar_double_set(Ivar *v, void *obj, int off, double x) { *((double *)((char *)obj + off)) = x; }
+
+static NSString *utf8_to_nsstring(char *str) { return [NSString stringWithUTF8String: str]; }
+static char *nsstring_to_utf8(void *nss) { return [(id)nss UTF8String]; }
+
+static void *alloc_autorelease_pool() { return [[NSAutoreleasePool alloc] init]; }
+static void drain_autorelease_pool(void *pool) { [(id)pool drain]; }
+
+static void *lookup_message_for_superclass(void *s, void *sel) {
+  struct objc_super sc;
+  sc.self = s;
+  sc.super_class = class_getSuperclass(object_getClass(s));
+  return objc_msg_lookup_super(&sc, sel);
+}
+
+EOF
+)
 
 
-(define meta-class-name
-  (lambda args (print (cadr args))))
+(define (object? x)
+  (tagged-pointer? x 'objective-c-object))
 
-(define property-name
-  (foreign-lambda c-string property_getName objc-property))
-(define property-attributes
-  (foreign-lambda c-string property_getAttributes objc-property))
+(define (make-object ptr)
+  (and ptr
+       (tag-pointer ptr 'objective-c-object)))
 
-(define protocol-conforms-to?
-  (foreign-lambda bool protocol_conformsToProtocol objc-protocol objc-protocol))
-(define protocol-equal?
-  (foreign-lambda bool protocol_isEqual objc-protocol objc-protocol))
-(define protocol-name
-  (foreign-lambda c-string protocol_getName objc-protocol))
-(define protocol-property
-  (foreign-lambda objc-property protocol_getProperty objc-protocol c-string bool bool))
+(define (check-object x loc)
+  ;;XXX loc not used yet
+  (cond ((not x) #f)
+	((pointer? x) (make-object x))
+	(else (error loc "not an object" x))))
 
+(define *enable-inline-cache* #f)	;XXX #t
 
-(define method-implementation-set!
-  (foreign-lambda objc-imp method_setImplementation objc-method objc-imp))
-(define method-exchange-implementations 
-  (foreign-lambda void method_exchangeImplementations objc-method objc-method))
-(define method-name
-  (foreign-lambda objc-selector method_getName objc-method))
-(define method-return-type
-  (foreign-lambda c-string method_copyReturnType objc-method))
-(define method-argument-length
-  (foreign-lambda int method_getNumberOfArguments objc-method))
-(define method-argument-type
-  (foreign-lambda c-string method_copyArgumentType objc-method unsigned-int))
-(define method-implementation
-  (foreign-lambda objc-imp method_getImplementation objc-method ))
-(define method-description
-  (foreign-lambda objc-method-description method_getDescription objc-method))
+(define (lookup-method receiver selector cache argc super?)
+  (define (skip p str)
+    (let ((len (string-length str)))
+      (let loop ((i p) (d #f) (beyond #f))
+	(if (fx>= i len)
+	    (if d
+		(error 'lookup-method "incomplete signature" str selector receiver)
+		len)
+	    (let ((c (string-ref str i)))
+	      (if d
+		  (loop (fx+ i 1) (not (char=? d c)) #t)
+		  (case c
+		    ((#\r #\R #\o #\O #\V #\n #\N #\^)
+		     (if beyond
+			 i
+			 (loop (fx+ i 1) #f #f)))
+		    ((#\() (loop (fx+ i 1) #\) #f))
+		    ((#\{) (loop (fx+ i 1) #\} #f))
+		    ((#\[) (loop (fx+ i 1) #\] #f))
+		    (else
+		     (cond ((char-numeric? c) (loop (fx+ i 1) #f beyond))
+			   (beyond i)
+			   (else (loop (fx+ i 1) #f #t)))))))))))
+  (define (make-caller receiver sel push)
+    (lambda args
+      (push (begin_call_setup) (cons receiver (cons sel args)))))
+  (let ((class (object_getClass (check-object receiver 'lookup-method))))
+    (d "[" receiver " (" (class_getName class) ") " selector " - cache: " cache "]")
+    (cond ((not class) (error "invalid object pointer" receiver selector))
+	  ((and *enable-inline-cache* (equal? (##sys#slot cache 0) class))
+	   (d "[cache hit " cache "]")
+	   (make-caller receiver (##sys#slot cache 1) (##sys#slot cache 2)))
+	  (else
+	   (let* ((sel (sel_registerName selector))
+		  (mth (class_getInstanceMethod class sel)))
+	     (if mth
+		 (let-syntax ((dpush
+			       (syntax-rules ()
+				 ((_ op k)
+				  (lambda (vm args)
+				    (op vm (car args))
+				    (k vm (cdr args))))))
+			      (dcall
+			       (syntax-rules ()
+				 ((_ op imp)
+				  (lambda (vm args)
+				    (let ((r (op vm imp)))
+				      (dcFree vm)
+				      r))))))
+		   (let* ((types (get_method_description_types mth))
+			  (len (string-length types))
+			  (imp ((if super? lookup_message_for_superclass objc_msg_lookup) receiver sel))
+			  (selobj (make-selector sel))
+			  (invoke (let loop ()
+				    (case (string-ref types 0)
+				      ((#\v)
+				       (lambda (vm args)
+					 (dcCallVoid vm imp)))
+				      ((#\c #\C) 
+				       (lambda (vm args)
+					 ;; hack around absent "bool" type
+					 (let ((r (dcCallChar vm imp)))
+					   (dcFree vm)
+					   (if (char=? #\x00 r) #f r))))
+				      ((#\s #\S) (dcall dcCallShort imp))
+				      ((#\b #\i #\I) (dcall dcCallInt imp))
+				      ((#\l #\L) (dcall dcCallLong imp))
+				      ((#\q #\Q) (dcall dcCallLongLong imp))
+				      ((#\f) (dcall dcCallFloat imp))
+				      ((#\d) (dcall dcCallDouble imp))
+				      ((#\* #\%) (dcall call_with_string_result imp))
+				      ((#\r #\R #\n #\N #\o #\O #\V) (loop))
+				      ((#\^) (dcall dcCallPointer imp))
+				      ((#\:) (lambda (vm args)
+					       (let ((r (make-selector (dcCallPointer vm imp))))
+						 (dcFree vm)
+						 r)))
+				      ((#\@ #\#)
+				       (lambda (vm args) 
+					 (let ((r (make-object (dcCallPointer vm imp))))
+					   (dcFree vm)
+					   r)))
+				      (else (error "unsupported result type" types selector)))))
+			  ;;XXX expand calls to 0-4 args completely
+			  (push
+			   (let loop ((i (skip 0 types)))
+			     (if (fx>= i len)
+				 invoke
+				 (let ((t (string-ref types i))
+				       (k (loop (skip i types))))
+				   (case t
+				     ((#\c #\C)
+				      ;; hack around absent "bool" type
+				      (lambda (vm args)
+					(let ((x (car args)))
+					  (dcArgChar
+					   vm
+					   (case x
+					     ((#f) #\x00)
+					     ((#t) #\x01)
+					     (else x)))
+					  (k vm (cdr args)))))
+				     ((#\s #\S) (dpush dcArgShort k))
+				     ((#\b #\i #\I) (dpush dcArgInt k))
+				     ((#\l #\L) (dpush dcArgLong k))
+				     ((#\Q #\q) (dpush dcArgLongLong k))
+				     ((#\f) (dpush dcArgFloat k))
+				     ((#\d) (dpush dcArgDouble k))
+				     ((#\*) 
+				      (lambda (vm args)
+					(push_string_argument vm (car args))
+					(k vm (cdr args))))
+				     ((#\r #\R #\n #\N #\o #\O #\V)
+				      (loop (fx+ i 1)))
+				     ((#\^) (dpush dcArgPointer k))
+				     ((#\:) (lambda (vm args)
+					      (dcArgPointer vm (check-selector (car args) 'lookup-method))
+					      (k vm (cdr args))))
+				     ((#\@ #\#) 
+				      (lambda (vm args)
+					(dcArgPointer vm (check-object (car args) 'lookup-method))
+					(k vm (cdr args))))
+				     (else
+				      (error "unsupported argument type" types 
+					     (string-append (make-string i #\space) "^") ; aren't we clever?
+					     selector)))))))
+			  (call (make-caller receiver selobj push)))
+		     (when *enable-inline-cache*
+		       (##sys#setslot cache 0 class)
+		       (##sys#setslot cache 1 selobj)
+		       (##sys#setslot cache 2 push)
+		       (d "[updated cache " cache "]"))
+		     call))
+		 (error "method not found" receiver selector)))))))
 
+(define (find-class name #!optional (err #t))
+  (make-object
+   (or (objc_getClass (->string name))
+       (and err (error "class not found" name)))))
 
-(define method-description-selector
-  (foreign-lambda* objc-selector ((objc-method-description md))
-    "C_return((*md).name);"))
-(define method-description-types
-  (foreign-lambda* objc-selector ((objc-method-description md))
-    "C_return((*md).types);"))
-(define (method-description-name objc-method-description)
-  (format "~A" (selector-name (method-description-selector objc-method-description))))
+(define (lookup-ivar obj name loc)
+  (let ((ivar (object_getInstanceVariable (check-object obj loc) (->string name) #f)))
+    (unless ivar
+      (error loc "instance variable not found in object" name obj))
+    ivar))
 
+;;XXX this is supposed to be slow, we could use caching here
+(define (object-set! obj var x)
+  (let* ((ivar (lookup-ivar obj var 'object-set!))
+	 (enc (ivar_getTypeEncoding ivar))
+	 (off (ivar_getOffset ivar))
+	 (len (string-length enc)))
+    (let loop ((i 0))
+      (case (string-ref enc i)
+	((#\c #\C)
+	 ;; hack around absent "bool" type
+	 (ivar_char_set 
+	  ivar obj off
+	  (case x
+	    ((#t) #\x01)
+	    ((#f) #\x00)
+	    (else x))))
+	((#\s #\S) (ivar_short_set ivar obj off x))
+	((#\b #\i #\I) (ivar_int_set ivar obj off x))
+	((#\l #\L) (ivar_long_set ivar obj off x))
+	((#\Q) (ivar_longlong_set ivar obj off x))
+	((#\f) (ivar_float_set ivar obj off x))
+	((#\d) (ivar_double_set ivar obj off x))
+	((#\*) (ivar_string_set ivar obj off x))
+	((#\r #\R #\n #\N #\o #\O #\V)
+	 (loop (fx+ i 1)))
+	((#\^) (ivar_ptr_set ivar obj off x))
+	((#\:) (ivar_ptr_set ivar obj off (check-selector x 'object-set!)))
+	((#\@ #\#) (ivar_ptr_set ivar obj off (check-object x 'object-set!)))
+	(else (error 'object-set! "unsupported instance-variable type" var enc obj))))))
 
-(define class-ivar*
-  (foreign-lambda objc-ivar class_getClassVariable objc-class c-string))
-(define class-ivar
-  (foreign-lambda objc-ivar class_getInstanceVariable objc-class c-string))
+;;XXX s.a.
+(define object-ref
+  (getter-with-setter
+   (lambda (obj var)
+     (let* ((ivar (lookup-ivar obj var 'object-ref))
+	    (enc (ivar_getTypeEncoding ivar))
+	    (off (ivar_getOffset ivar))
+	    (len (string-length enc)))
+       (let loop ((i 0))
+	 (case (string-ref enc i)
+	   ((#\c #\C)
+	    ;; hack around absent "bool" type
+	    (let ((c (ivar_char_ref ivar obj off)))
+	      (case c
+		((#\x00) #f)
+		((#\x01) #t)
+		(else c))))
+	   ((#\s #\S) (ivar_short_ref ivar obj off))
+	   ((#\b #\i #\I) (ivar_int_ref ivar obj off))
+	   ((#\l #\L) (ivar_long_ref ivar obj off))
+	   ((#\Q #\q) (ivar_longlong_ref ivar obj off))
+	   ((#\f) (ivar_float_ref ivar obj off))
+	   ((#\d) (ivar_double_ref ivar obj off))
+	   ((#\*) (ivar_string_ref ivar obj off))
+	   ((#\r #\R #\n #\N #\o #\O #\V)
+	    (loop (fx+ i 1)))
+	   ((#\^) (ivar_ptr_ref ivar obj off))
+	   ((#\:) (make-selector (ivar_ptr_ref ivar obj off)))
+	   ((#\@ #\#) (make-object (ivar_ptr_ref ivar obj off)))
+	   (else (error 'object-ref "unsupported instance-variable type" var enc obj))))))
+   object-set!))
 
+(define NSString (find-class "NSString"))
+(define NSObject (find-class "NSObject"))
+(define Object (find-class "Object"))
 
+(define (string->NSString str)
+  (make-object (utf8_to_nsstring str)))
 
+(define (NSString->string nss)
+  (nsstring_to_utf8 (check-object nss 'NSString->string)))
 
-(include "macro-defs.scm"))
+(define (make-selector ptr)
+  (tag-pointer ptr 'objective-c-selector))
+
+(define (selector? x)
+  (tagged-pointer? x 'objective-c-selector))
+
+(define (check-selector x loc)
+  (assert (selector? x) "not a selector" x)
+  x)
+
+(define (string->selector str)
+  (tag-pointer (sel_registerName str) 'objective-c-selector))
+
+(define (selector->string sel)
+  (sel_getName (check-selector sel 'selector->string)))
+
+(define (string->selector str)
+  (make-selector (sel_registerName str)))
+
+(define (selector->string sel)
+  (sel_getName (check-selector sel 'selector->string)))
+
+(define (class? x)
+  (and x
+       (object? x)
+       (class_isMetaClass (class-of x))))
+
+(define (class-name obj)
+  (if obj
+      (let ((cls (check-object obj 'class-name)))
+	(if (class? cls) 
+	(class_getName (check-object obj 'class-name))
+	(error 'class-name "not a class" obj)))
+      "Nil"))
+
+(define (class-of obj)
+  (and obj
+       (make-object (object_getClass (check-object obj 'class-of)))))
+
+(define (superclass-of cls)
+  (and cls
+       (if (class? cls)
+	   (make-object (class_getSuperclass cls))
+	   (error 'superclass-of "not a class" cls))))
+
+(define nil #f)
+
+(define ##objc#make-object make-object)
+(define ##objc#make-selector make-selector)
+
+(define base-pool (alloc_autorelease_pool))
+
+(on-exit
+ (lambda ()
+   (drain_autorelease_pool base-pool)))

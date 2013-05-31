@@ -1,6 +1,55 @@
-(compile -s -objc -I/usr/include/GNUstep -lgnustep-base -lobjc -J objc.scm -C -D_NATIVE_OBJC_EXCEPTIONS)
-(compile -s objc.import.scm)
+(use make utils posix)
 
-(install-extension 'objc
-  '("objc.so" "objc.import.so")
-  '((version "0.1")))
+
+;;XXX add Apple-specific flags
+
+;;XXX detect whether GNUStep is installed or not
+(define has-gnustep #t)			
+
+
+#;(define cflags
+  (cond-expand
+    (macosx "???")			;XXX
+    (else (with-input-from-pipe "gnustep-config --objc-flags" read-all))))
+
+;; We use these instead - those GNUstep dumbasses added optimization- and warning flags to the output
+;; of "gnustep-config" ...
+(define cflags
+  (if has-gnustep
+      (string-append
+       " -DGNUSTEP -DGNU_GUI_LIBRARY=1 -DGNU_RUNTIME=1 -DGNUSTEP_BASE_LIBRARY=1 -fexceptions -fobjc-exceptions"
+       " -D_NATIVE_OBJC_EXCEPTIONS -DGSWARN -DGSDIAGNOSE -Wno-import --param=ssp-buffer-size=4"
+       " -fgnu-runtime -fconstant-string-class=NSConstantString"
+       " -I" (qs (with-input-from-pipe "gnustep-config --variable=GNUSTEP_SYSTEM_HEADERS" read-line)))
+      ""))
+
+(define libs
+  (cond-expand
+    (macosx "???")			;XXX
+    (else
+     (if has-gnustep
+	 "-lgnustep-base -lobjc -ldyncall_s"
+	 "-lobjc -ldyncall_s"))))
+
+(make (("objc-compile-time.so" ("objc-compile-time.scm" "foreign-types.scm")
+	(compile -sJ -O3 -d0 objc-compile-time.scm)
+	(compile -s -d0 objc-compile-time.import.scm))
+       ("objc.so" ("objc-module.scm" "objc.scm" "objc-syntax.scm" "objc-compile-time.so")
+	(compile -sJ objc-module.scm -C ,(qs cflags) 
+		 -O3 -d1
+		 -C -Wno-unused-variable -C -Wno-unused-but-set-variable -C -Wno-unused-function
+		 -objc ,libs -o objc.so)
+	(compile -s -d0 objc.import.scm))
+       ("objc-read-syntax.so" ("objc-read-syntax.scm" "objc-compile-time.so")
+	(compile -s -O3 -d0 objc-read-syntax.scm)))
+  '("objc-compile-time.so"
+    "objc.so"
+    "objc-read-syntax.so"))
+
+(install-extension
+ 'objc 
+ '("objc-compile-time.so"
+   "objc-read-syntax.so"
+   "objc.import.so"
+   "objc-compile-time.import.so"
+   "objc.so"))

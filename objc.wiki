@@ -1,0 +1,167 @@
+[[toc:]]
+[[tags: eggs]]
+
+== objc
+
+=== Requirements
+
+[[make]] [[matchable]] [[miscmacros]] [[fmt]]
+
+
+=== Introduction
+
+This egg provides a simple interface to [[https://en.wikipedia.org/wiki/Objective-C|Objective-C]].
+
+... GNUstep, Apple, ...
+
+This egg is part of the [[https://github.com/organizations/chicken-mobile|chicken-mobile]]
+project. The sources are available here: [[https://github.com/chicken-mobile/concurrent-native-callbacks]]
+
+=== Programming interface
+
+==== Declarations and definitions
+
+<syntax>(objc-import IMPORT ...</syntax>
+
+...
+
+<syntax>(define-objc-class NAME)</syntax>
+
+...
+
+<syntax>(define-objc-interface NAME [: PARENT] DECLARATION ...)</syntax>
+
+...
+
+<syntax>(define-objc-implementation NAME DEFINITION ...)</syntax>
+
+...
+
+<syntax>(send RECEIVER SELECTOR ARGUMENT ...)</syntax>
+
+...
+
+<syntax>(@selector NAME)</syntax>
+
+...
+
+<syntax>(@ STRING)</syntax>
+<syntax>(@ SYMBOL)</syntax>
+<syntax>(@ RECEIVER SELECTOR ARGUMENT ...)</syntax>
+
+...
+
+==== Objects
+
+<procedure>(object? X)</procedure>
+
+...
+
+<procedure>(object-ref OBJECT SYMBOL)</procedure>
+
+...
+
+<procedure>(object-set! OBJECT SYMBOL X)</procedure>
+
+...
+
+<variable>nil</variable>
+
+...
+
+==== Classes
+
+<class>Object</class>
+
+...
+
+<class>NSObject</class>
+
+...
+
+<procedure>(class? X)</procedure>
+
+...
+
+<procedure>(class-of OBJECT)</procedure>
+
+...
+
+<procedure>(class-name CLASS)</procedure>
+
+...
+
+<procedure>(find-class NAME)</procedure>
+
+...
+
+<procedure>(superclass-of CLASS)</procedure>
+
+...
+
+==== Selectors
+
+<procedure>(selector? X)</procedure>
+
+...
+
+<procedure>(string->selector STRING)</procedure>
+
+...
+
+<procedure>(selector->string SELECTOR)</procedure>
+
+...
+
+==== NSString
+
+<class>NSString</class>
+
+...
+
+<procedure>(string->NSString STRING)</procedure>
+
+...
+
+<procedure>(NSString->string NSSTRING)</procedure>
+
+...
+
+==== Method-call read-syntax
+
+<syntax>[RECEIVER SELECTOR ARGUMENT ...]</syntax>
+
+...
+
+=== Restrictions
+
+...
+
+=== Version History
+
+; 0.1 : initial release
+
+=== License
+
+  Copyright (c) 2013, Bevuta IT GmbH
+  All rights reserved.
+  
+  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following
+  conditions are met:
+  
+    Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+      disclaimer.
+    Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following
+      disclaimer in the documentation and/or other materials provided with the distribution.
+    Neither the name of the author nor the names of its contributors may be used to endorse or promote
+      products derived from this software without specific prior written permission.
+  
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS
+  OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+  AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR
+  CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+  POSSIBILITY OF SUCH DAMAGE.
