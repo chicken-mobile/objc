@@ -1,4 +1,4 @@
-((depends make fmt miscmacros matchable)
+((depends make fmt miscmacros matchable bind)
  (test-depends test)
  (synopsis "An interface to Objective-C")
  (category ffi)
