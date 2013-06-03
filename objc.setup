@@ -7,14 +7,14 @@
 (define has-gnustep #t)			
 
 
-#;(define cflags
+(define cflags
   (cond-expand
-    (macosx "???")			;XXX
+    (macosx "-I. -framework Foundation")
     (else (with-input-from-pipe "gnustep-config --objc-flags" read-all))))
 
 ;; We use these instead - those GNUstep dumbasses added optimization- and warning flags to the output
 ;; of "gnustep-config" ...
-(define cflags
+#;(define cflags
   (if has-gnustep
       (string-append
        " -DGNUSTEP -DGNU_GUI_LIBRARY=1 -DGNU_RUNTIME=1 -DGNUSTEP_BASE_LIBRARY=1 -fexceptions -fobjc-exceptions"
@@ -25,7 +25,7 @@
 
 (define libs
   (cond-expand
-    (macosx "???")			;XXX
+    (macosx "-L. -ldyncall_s")
     (else
      (if has-gnustep
 	 "-lgnustep-base -lobjc -ldyncall_s"
@@ -36,8 +36,8 @@
 	(compile -s -d0 objc-compile-time.import.scm))
        ("objc.so" ("objc-module.scm" "objc.scm" "objc-syntax.scm" "objc-compile-time.so")
 	(compile -sJ objc-module.scm -C ,(qs cflags) 
-		 -O3 -d1
-		 -C -Wno-unused-variable -C -Wno-unused-but-set-variable -C -Wno-unused-function
+		 -O3 -d1 -v
+		 ;-C -Wno-unused-variable -C -Wno-unused-but-set-variable -C -Wno-unused-function
 		 -objc ,libs -o objc.so)
 	(compile -s -d0 objc.import.scm))
        ("objc-read-syntax.so" ("objc-read-syntax.scm" "objc-compile-time.so")

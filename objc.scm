@@ -28,14 +28,18 @@
 
 
 #>
-#ifdef __GNUSTEP__
-# define _NATIVE_OBJC_ECXEPTIONS
-#endif
-
 #include <dyncall.h>
 #include <objc/objc.h>
+
+#ifdef __GNUSTEP__
+# define _NATIVE_OBJC_ECXEPTIONS
 #include <objc/runtime.h>
 #include <objc/message.h>
+#elif defined(__APPLE__)
+# include <objc/objc-runtime.h>
+# include <objc/objc-class.h>
+#endif
+
 #import <Foundation/Foundation.h>
 #import <Foundation/NSString.h>
 #import <Foundation/NSObject.h>
