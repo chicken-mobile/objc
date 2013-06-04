@@ -9,7 +9,7 @@
 
 (define cflags
   (cond-expand
-    (macosx "-I. -framework Foundation")
+    (macosx "-I. -framework Cocoa")
     (else (with-input-from-pipe "gnustep-config --objc-flags" read-all))))
 
 ;; We use these instead - those GNUstep dumbasses added optimization- and warning flags to the output
@@ -25,7 +25,7 @@
 
 (define libs
   (cond-expand
-    (macosx "-L. -ldyncall_s")
+    (macosx "-L. -ldyncall_s -L -framework -L Cocoa -L -fobjc-link-runtime -lobjc")
     (else
      (if has-gnustep
 	 "-lgnustep-base -lobjc -ldyncall_s"
