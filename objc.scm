@@ -181,6 +181,14 @@ EOF
 
 (define *enable-inline-cache* #f)	;XXX #t
 
+(define (get-method class sel)
+  (cond-expand
+    (macosx
+     (if (class_isMetaClass class)
+	 (class_getClassMethod class sel)
+	 (class_getInstanceMethod class sel)))
+    (else (class_getInstanceMethod class sel))))
+
 (define (lookup-method receiver selector cache argc super?)
   (define (skip p str)
     (let ((len (string-length str)))
@@ -215,9 +223,7 @@ EOF
 	   (make-caller receiver (##sys#slot cache 1) (##sys#slot cache 2)))
 	  (else
 	   (let* ((sel (sel_registerName selector))
-		  (mth (if (class_isMetaClass class)
-			   (class_getClassMethod class sel)
-			   (class_getInstanceMethod class sel))))
+		  (mth (get-method class sel)))
 	     (if mth
 		 (let-syntax ((dpush
 			       (syntax-rules ()
