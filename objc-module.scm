@@ -16,6 +16,7 @@
 	      @
 	      class-of
 	      class?
+	      metaclass?
 	      class-name
 	      string->selector
 	      selector->string

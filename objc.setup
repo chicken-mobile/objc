@@ -1,31 +1,31 @@
 (use make utils posix)
 
 
-;;XXX add Apple-specific flags
-
 ;;XXX detect whether GNUStep is installed or not
 (define has-gnustep #t)			
 
 
 (define cflags
   (cond-expand
-    (macosx "-I. -framework Cocoa")
-    (else (with-input-from-pipe "gnustep-config --objc-flags" read-all))))
+    (macosx "-I.")
+    (else
 
-;; We use these instead - those GNUstep dumbasses added optimization- and warning flags to the output
-;; of "gnustep-config" ...
-#;(define cflags
-  (if has-gnustep
-      (string-append
-       " -DGNUSTEP -DGNU_GUI_LIBRARY=1 -DGNU_RUNTIME=1 -DGNUSTEP_BASE_LIBRARY=1 -fexceptions -fobjc-exceptions"
-       " -D_NATIVE_OBJC_EXCEPTIONS -DGSWARN -DGSDIAGNOSE -Wno-import --param=ssp-buffer-size=4"
-       " -fgnu-runtime -fconstant-string-class=NSConstantString"
-       " -I" (qs (with-input-from-pipe "gnustep-config --variable=GNUSTEP_SYSTEM_HEADERS" read-line)))
-      ""))
+     ;;(with-input-from-pipe "gnustep-config --objc-flags" read-all)
+
+     ;; We use these instead - those GNUstep dumbasses added optimization- and warning flags to the output
+     ;; of "gnustep-config" ...
+     (if has-gnustep
+	 (string-append
+	  " -DGNUSTEP -DGNU_GUI_LIBRARY=1 -DGNU_RUNTIME=1 -DGNUSTEP_BASE_LIBRARY=1 -fexceptions -fobjc-exceptions"
+	  " -D_NATIVE_OBJC_EXCEPTIONS -DGSWARN -DGSDIAGNOSE -Wno-import --param=ssp-buffer-size=4"
+	  " -Wno-unused-variable -Wno-unused-but-set-variable -Wno-unused-function"
+	  " -fgnu-runtime -fconstant-string-class=NSConstantString"
+	  " -I" (qs (with-input-from-pipe "gnustep-config --variable=GNUSTEP_SYSTEM_HEADERS" read-line)))
+	 ""))))
 
 (define libs
   (cond-expand
-    (macosx "-L. -ldyncall_s -L -framework -L Cocoa -L -fobjc-link-runtime -lobjc")
+    (macosx "-L. -ldyncall_s -L -framework -L Cocoa -L -lobjc")
     (else
      (if has-gnustep
 	 "-lgnustep-base -lobjc -ldyncall_s"
@@ -37,7 +37,6 @@
        ("objc.so" ("objc-module.scm" "objc.scm" "objc-syntax.scm" "objc-compile-time.so")
 	(compile -sJ objc-module.scm -C ,(qs cflags) 
 		 -O3 -d1 -v
-		 ;-C -Wno-unused-variable -C -Wno-unused-but-set-variable -C -Wno-unused-function
 		 -objc ,libs -o objc.so)
 	(compile -s -d0 objc.import.scm))
        ("objc-read-syntax.so" ("objc-read-syntax.scm" "objc-compile-time.so")

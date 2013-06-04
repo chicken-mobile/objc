@@ -30,11 +30,11 @@
 #>
 #include <dyncall.h>
 #include <objc/objc.h>
+#include <objc/runtime.h>
+#include <objc/message.h>
 
 #ifdef __GNUSTEP__
 # define _NATIVE_OBJC_ECXEPTIONS
-#include <objc/runtime.h>
-#include <objc/message.h>
 #elif defined(__APPLE__)
 # include <objc/objc-runtime.h>
 # include <objc/objc-class.h>
@@ -43,6 +43,22 @@
 #import <Foundation/Foundation.h>
 #import <Foundation/NSString.h>
 #import <Foundation/NSObject.h>
+
+#ifdef __APPLE__
+static void *objc_msg_lookup(void *rec, void *sel)
+{
+  Class c = object_getClass(rec);
+
+  return class_getMethodImplementation(c, sel);
+}
+
+static void *objc_msg_lookup_super (struct objc_super *sup, void *sel)
+{
+  Class *c = sup->super_class;
+
+  return class_getMethodImplementation(c, sel);
+}
+#endif
 <#
 
 (bind #<<EOF
@@ -74,8 +90,8 @@ void *sel_registerName(char *);
 char *sel_getName(void *);
 char *object_getClassName(void *);
 void *object_getClass(void *);
-void *objc_msg_lookup(void *, void *);
 void *class_getInstanceMethod(void *, void *);
+void *class_getClassMethod(void *, void *);
 void *objc_getClass(char *);
 char *class_getName(void *);
 void *class_getSuperclass(void *);
@@ -84,13 +100,13 @@ void *object_getInstanceVariable(void *, char *, void *);
 char *ivar_getTypeEncoding(void *);
 int ivar_getOffset(void *);
 ___bool class_isMetaClass(void *);
+void *objc_msg_lookup(void *, void *);
 
 EOF
 )
 
 (bind* #<<EOF
 
-static char *get_method_description_types(void *mth) { return method_getDescription(mth)->types; }
 ___safe static char *call_with_string_result(DCCallVM *vm, void *ptr) { return dcCallPointer(vm, ptr); }
 static void push_string_argument(DCCallVM *vm, char *ptr) { dcArgPointer(vm, ptr); }
 
@@ -127,9 +143,21 @@ static char *nsstring_to_utf8(void *nss) { return [(id)nss UTF8String]; }
 static void *alloc_autorelease_pool() { return [[NSAutoreleasePool alloc] init]; }
 static void drain_autorelease_pool(void *pool) { [(id)pool drain]; }
 
+static char *get_method_description_types(void *mth) { 
+#ifdef __APPLE__
+  return method_getTypeEncoding(mth);
+#else
+  return method_getDescription(mth)->types; 
+#endif
+}
+
 static void *lookup_message_for_superclass(void *s, void *sel) {
   struct objc_super sc;
+#ifdef __APPLE__
+  sc.receiver = s;
+#else
   sc.self = s;
+#endif
   sc.super_class = class_getSuperclass(object_getClass(s));
   return objc_msg_lookup_super(&sc, sel);
 }
@@ -187,7 +215,9 @@ EOF
 	   (make-caller receiver (##sys#slot cache 1) (##sys#slot cache 2)))
 	  (else
 	   (let* ((sel (sel_registerName selector))
-		  (mth (class_getInstanceMethod class sel)))
+		  (mth (if (class_isMetaClass class)
+			   (class_getClassMethod class sel)
+			   (class_getInstanceMethod class sel))))
 	     (if mth
 		 (let-syntax ((dpush
 			       (syntax-rules ()
@@ -397,6 +427,11 @@ EOF
   (and x
        (object? x)
        (class_isMetaClass (class-of x))))
+
+(define (metaclass? x)
+  (and x
+       (object? x)
+       (class_isMetaClass x)))
 
 (define (class-name obj)
   (if obj

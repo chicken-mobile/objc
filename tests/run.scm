@@ -4,6 +4,8 @@
 (load "test2.scm")
 
 (define objcflags
-  (with-input-from-pipe "gnustep-config --objc-flags" read-all))
+  (cond-expand
+   (macosx "")
+   (else (with-input-from-pipe "gnustep-config --objc-flags" read-all))))
 
-(compile-file "test3.scm" options: `("-objc" "-C" ,(qs objcflags) "-C -w"))
+(compile-file "test3.scm" options: `("-framework" "Cocoa" "-objc" "-C" ,(qs objcflags) "-C -w"))
