@@ -5,6 +5,10 @@
 
 (test-begin)
 
+(install-autorelease-pool)
+
+(NSLog "starting test1 ...")
+
 (define (superclass-chain cls)
   (if cls
       (let ((s (superclass-of cls)))

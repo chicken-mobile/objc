@@ -6,6 +6,10 @@
 
 (test-begin)
 
+(install-autorelease-pool)
+
+(NSLog "starting test2 ...")
+
 (define s1 (@ "this is a test"))
 (test (string-length "this is a test") (@ s1 length))
 (test "" (NSString->string (@ (find-class "NSString") string)))

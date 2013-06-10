@@ -459,11 +459,21 @@ EOF
 
 (define nil #f)
 
+;;XXX why do these exist?
 (define ##objc#make-object make-object)
 (define ##objc#make-selector make-selector)
 
-(define base-pool (alloc_autorelease_pool))
+(define (with-autorelease-pool thunk)
+  (let ((pool (alloc_autorelease_pool)))
+    (call-with-values thunk
+      (lambda results
+	(drain_autorelease_pool pool)
+	(apply values results)))))
 
-(on-exit
- (lambda ()
-   (drain_autorelease_pool base-pool)))
+(define (install-autorelease-pool)
+  (let ((pool (alloc_autorelease_pool)))
+    (on-exit (cut drain_autorelease_pool pool))))
+
+(define NSLog 
+  (foreign-lambda* void ((c-string str))
+    "NSLog(@\"%s\", str);"))

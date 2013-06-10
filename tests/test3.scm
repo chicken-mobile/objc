@@ -3,6 +3,7 @@
 
 (use test objc)
 
+(install-autorelease-pool)
 
 (objc-import "<objc/Object.h>")
 (objc-import "<Foundation/NSObject.h>")

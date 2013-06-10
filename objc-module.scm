@@ -13,6 +13,7 @@
 	      Object
 	      NSObject
 	      @selector
+	      NSLog
 	      @
 	      class-of
 	      class?
@@ -23,6 +24,8 @@
 	      selector?
 	      superclass-of
 	      nil
+	      with-autorelease-pool
+	      install-autorelease-pool
 	      (send lookup-method))
 
 (import scheme chicken)
