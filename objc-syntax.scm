@@ -97,7 +97,7 @@
       ((_ (? string? s))
        `(,(r 'string->NSString) ,s))	;XXX cache
       ((_ sym)
-       `(,(r '@selector) ,sym))
+       `(,(r 'object-ref) self ',sym))
       ((_ recv args ...)
        (let-values (((sel args) (parse-selector-list args car+cdr '@)))
 	 `(,(r 'send) ,recv ,sel ,@args))))))
