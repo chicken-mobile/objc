@@ -10,6 +10,9 @@
 This extension makes use of [[http://dyncall.org|dyncall]], a library for constructing
 C function-calls at runtime. The library needs to be installed for this egg to function properly.
 
+The code references NEXTSTEP/GNUstep/Cocoa classes like {{NSString}} and {{NSObject}} so
+the appropriate runtime support must exist.
+
 === Introduction
 
 This egg provides a leightweight interface to [[https://en.wikipedia.org/wiki/Objective-C|Objective-C]].
@@ -76,6 +79,9 @@ Defines an implementation section for methods of the class {{NAME}}
 {{(DECLARATION BODY ...)}} where {{DECLARATION}} follows the syntax given above
 for {{define-objc-interface}}.
 
+Inside the {{BODY ...}} expressions the implicit variable {{self}} refers to the
+current receiver.
+
 This form can only be used in compiled code.
 
 <syntax>(send RECEIVER SELECTOR ARGUMENT ...)</syntax>
@@ -96,11 +102,11 @@ The {{@}} syntax has three different meanings, depending on the type and number 
 
 * {{(@ STRING)}} returns an instance of {{NSString}} and is similar to the {{@"..."}} syntax in Objective-C
 
-* {{(@ NAME)}} is equivalent to {{(@selector NAME)}}.
+* {{(@ NAME)}} is equivalent to {{(object-ref self 'NAME)}}. Note that {{object-ref}} has a "setter", so code like {{(set! (@ myvar) ...)}} is completely valid.
 
 * {{(@ RECEIVER SYMBOL)}} is equivalent to {{(send RECEIVER SYMBOL)}}.
 
-* {{(@ RECEIVER KEYWORD1 ARGUMENT1 ...)}} is equivalent to {{(send RECEIVER KEYWORD1:KEYWORD2:... ARGUMENT1 ARGUMENT2 ...)}}.
+* {{(@ RECEIVER KEYWORD1 ARGUMENT1 ...)}} is equivalent to {{(send RECEIVER KEYWORD1:KEYWORD2:... ARGUMENT1 ARGUMENT2 ...)}}. The receiver may be the special variable {{super}} which sends to a message to {{self}} but starts the message-lookup in the superclass of the receiver (this is only valid inside a method-implementation).
 
 ==== Objects
 
@@ -185,6 +191,27 @@ assumed to have UTF-8 encoding.
 
 Returns a Scheme string with the same contents as the {{NSString}}
 instance given in {{NSSTRING}}. The returned string will be UTF-8 encoded.
+
+==== Autorelease pools
+
+<procedure>(with-autorelease-pool THUNK)</procedure>
+
+Executes the 0-argument procedure {{THUNK}} and returns its results. During execution
+of {{THUNK}} a new {{NSAutoreleasePool}} will be active. Once {{THUNK}} returns the
+autorelease pool will be released.
+
+<procedure>(install-autorelease-pool)</procedure>
+
+Creates an {{NSAutoreleasePool}}. The pool will be released when
+the application terminates (normally). Unless the code using this Objective-C interface
+is running in an embedded application, it is recommended to install an autorelease pool
+before creating any objects.
+
+==== Miscellaneous functionality
+
+<procedure>(NSLog STRING)</procedure>
+
+Writes a log message.
 
 ==== Method-call read-syntax
 
