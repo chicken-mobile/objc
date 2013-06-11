@@ -5,9 +5,13 @@
 
 (test-begin)
 
-(install-autorelease-pool)
+;(install-autorelease-pool)
 
 (NSLog "starting test1 ...")
+
+(define NSString (find-class 'NSString))
+(define (string->NSString s) (@ NSString stringWithUTF8String: s))
+(define (NSString->string s) (@ s UTF8String))
 
 (define (superclass-chain cls)
   (if cls

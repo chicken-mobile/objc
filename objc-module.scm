@@ -7,11 +7,7 @@
 	      define-objc-implementation
 	      object-ref object-set!
 	      find-class
-	      string->NSString
-	      NSString->string
-	      NSString
 	      Object
-	      NSObject
 	      @selector
 	      NSLog
 	      @
@@ -24,8 +20,6 @@
 	      selector?
 	      superclass-of
 	      nil
-	      with-autorelease-pool
-	      install-autorelease-pool
 	      (send lookup-method))
 
 (import scheme chicken)

@@ -40,11 +40,8 @@
 # include <objc/objc-class.h>
 #endif
 
-#import <Foundation/Foundation.h>
-#import <Foundation/NSString.h>
-#import <Foundation/NSObject.h>
-
-#ifdef __APPLE__
+#if defined(__APPLE__)
+//XXX this is possibly doing a second message lookup on Mac/iOS
 static void *objc_msg_lookup(void *rec, void *sel)
 {
   Class c = object_getClass(rec);
@@ -52,9 +49,13 @@ static void *objc_msg_lookup(void *rec, void *sel)
   return class_getMethodImplementation(c, sel);
 }
 
-static void *objc_msg_lookup_super (struct objc_super *sup, void *sel)
+static void *objc_msg_lookup_super(struct objc_super *sup, void *sel)
 {
-  Class *c = sup->super_class;
+#if !defined(__cplusplus)  &&  !__OBJC2__
+  Class c = sup->class;
+#else
+  Class c = sup->super_class;
+#endif
 
   return class_getMethodImplementation(c, sel);
 }
@@ -137,12 +138,6 @@ static void ivar_string_set(Ivar *v, void *obj, int off, char *x) { *((char **)(
 static void ivar_float_set(Ivar *v, void *obj, int off, float x) { *((float *)((char *)obj + off)) = x; }
 static void ivar_double_set(Ivar *v, void *obj, int off, double x) { *((double *)((char *)obj + off)) = x; }
 
-static NSString *utf8_to_nsstring(char *str) { return [NSString stringWithUTF8String: str]; }
-static char *nsstring_to_utf8(void *nss) { return [(id)nss UTF8String]; }
-
-static void *alloc_autorelease_pool() { return [[NSAutoreleasePool alloc] init]; }
-static void drain_autorelease_pool(void *pool) { [(id)pool drain]; }
-
 static char *get_method_description_types(void *mth) { 
 #ifdef __APPLE__
   return method_getTypeEncoding(mth);
@@ -158,7 +153,11 @@ static void *lookup_message_for_superclass(void *s, void *sel) {
 #else
   sc.self = s;
 #endif
+#if defined(__APPLE__) && !defined(__cplusplus)  &&  !__OBJC2__
+  sc.class = class_getSuperclass(object_getClass(s));
+#else
   sc.super_class = class_getSuperclass(object_getClass(s));
+#endif
   return objc_msg_lookup_super(&sc, sel);
 }
 
@@ -397,15 +396,7 @@ EOF
 	   (else (error 'object-ref "unsupported instance-variable type" var enc obj))))))
    object-set!))
 
-(define NSString (find-class "NSString"))
-(define NSObject (find-class "NSObject"))
 (define Object (find-class "Object"))
-
-(define (string->NSString str)
-  (make-object (utf8_to_nsstring str)))
-
-(define (NSString->string nss)
-  (nsstring_to_utf8 (check-object nss 'NSString->string)))
 
 (define (make-selector ptr)
   (tag-pointer ptr 'objective-c-selector))
@@ -462,17 +453,6 @@ EOF
 ;;XXX why do these exist?
 (define ##objc#make-object make-object)
 (define ##objc#make-selector make-selector)
-
-(define (with-autorelease-pool thunk)
-  (let ((pool (alloc_autorelease_pool)))
-    (call-with-values thunk
-      (lambda results
-	(drain_autorelease_pool pool)
-	(apply values results)))))
-
-(define (install-autorelease-pool)
-  (let ((pool (alloc_autorelease_pool)))
-    (on-exit (cut drain_autorelease_pool pool))))
 
 (define NSLog 
   (foreign-lambda* void ((c-string str))

@@ -94,8 +94,6 @@
 (define-syntax @
   (lambda (x r c)
     (match x
-      ((_ (? string? s))
-       `(,(r 'string->NSString) ,s))	;XXX cache
       ((_ sym)
        `(,(r 'object-ref) self ',sym))
       ((_ recv args ...)
