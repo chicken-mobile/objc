@@ -108,7 +108,10 @@ EOF
 
 (bind* #<<EOF
 
-___safe static char *call_with_string_result(DCCallVM *vm, void *ptr) { return dcCallPointer(vm, ptr); }
+___safe static char *call_with_string_result(DCCallVM *vm, void *ptr) { 
+  return dcCallPointer(vm, ptr); 
+}
+
 static void push_string_argument(DCCallVM *vm, char *ptr) { dcArgPointer(vm, ptr); }
 
 static DCCallVM *begin_call_setup() { 
@@ -238,11 +241,12 @@ EOF
 				      (dcFree vm)
 				      r))))))
 		   (let* ((types (get_method_description_types mth))
+			  ;(_ (print "types: " selector " - " types))
 			  (len (string-length types))
 			  (imp ((if super? lookup_message_for_superclass objc_msg_lookup) receiver sel))
 			  (selobj (make-selector sel))
-			  (invoke (let loop ()
-				    (case (string-ref types 0)
+			  (invoke (let loop ((i 0))
+				    (case (string-ref types i)
 				      ((#\v)
 				       (lambda (vm args)
 					 (dcCallVoid vm imp)))
@@ -259,7 +263,7 @@ EOF
 				      ((#\f) (dcall dcCallFloat imp))
 				      ((#\d #\D) (dcall dcCallDouble imp))
 				      ((#\* #\%) (dcall call_with_string_result imp))
-				      ((#\r #\R #\n #\N #\o #\O #\V) (loop))
+				      ((#\r #\R #\n #\N #\o #\O #\V) (loop (fx+ i 1)))
 				      ((#\^) (dcall dcCallPointer imp))
 				      ((#\:) (lambda (vm args)
 					       (let ((r (make-selector (dcCallPointer vm imp))))
@@ -453,7 +457,3 @@ EOF
 ;;XXX why do these exist?
 (define ##objc#make-object make-object)
 (define ##objc#make-selector make-selector)
-
-(define NSLog 
-  (foreign-lambda* void ((c-string str))
-    "NSLog(@\"%s\", str);"))

@@ -9,7 +9,6 @@
 	      find-class
 	      Object
 	      @selector
-	      NSLog
 	      @
 	      class-of
 	      class?

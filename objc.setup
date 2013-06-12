@@ -16,27 +16,21 @@
      ;; of "gnustep-config" ...
      (if has-gnustep
 	 (string-append
-	  " -DGNUSTEP -DGNU_GUI_LIBRARY=1 -DGNU_RUNTIME=1 -DGNUSTEP_BASE_LIBRARY=1 -fexceptions -fobjc-exceptions"
-	  " -D_NATIVE_OBJC_EXCEPTIONS -DGSWARN -DGSDIAGNOSE -Wno-import --param=ssp-buffer-size=4"
+	  " -fexceptions -fobjc-exceptions"
+	  " -D_NATIVE_OBJC_EXCEPTIONS -Wno-import --param=ssp-buffer-size=4"
 	  " -Wno-unused-variable -Wno-unused-but-set-variable -Wno-unused-function"
-	  " -fgnu-runtime -fconstant-string-class=NSConstantString"
-	  " -I" (qs (with-input-from-pipe "gnustep-config --variable=GNUSTEP_SYSTEM_HEADERS" read-line)))
+	  " -fgnu-runtime")
 	 ""))))
 
-(define libs
-  (cond-expand
-    (macosx "-L. -ldyncall_s -L -framework -L Cocoa -L -lobjc")
-    (else
-     (if has-gnustep
-	 "-lgnustep-base -lobjc -ldyncall_s"
-	 "-lobjc -ldyncall_s"))))
+(define libs "-L. -ldyncall_s -L -lobjc")
 
 (make (("objc-compile-time.so" ("objc-compile-time.scm" "foreign-types.scm")
 	(compile -sJ -O3 -d0 objc-compile-time.scm)
 	(compile -s -d0 objc-compile-time.import.scm))
        ("objc.so" ("objc-module.scm" "objc.scm" "objc-syntax.scm" "objc-compile-time.so")
 	(compile -sJ objc-module.scm -C ,(qs cflags) 
-		 -O3 -d1 -v
+		 -O0 -C -g -v -k
+		 ;-O3 -d1
 		 -objc ,libs -o objc.so)
 	(compile -s -d0 objc.import.scm))
        ("objc-read-syntax.so" ("objc-read-syntax.scm" "objc-compile-time.so")

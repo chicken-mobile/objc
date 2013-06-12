@@ -10,9 +10,6 @@
 This extension makes use of [[http://dyncall.org|dyncall]], a library for constructing
 C function-calls at runtime. The library needs to be installed for this egg to function properly.
 
-The code references NEXTSTEP/GNUstep/Cocoa classes like {{NSString}} and {{NSObject}} so
-the appropriate runtime support must exist.
-
 === Introduction
 
 This egg provides a leightweight interface to [[https://en.wikipedia.org/wiki/Objective-C|Objective-C]].
@@ -98,14 +95,9 @@ Returns the selector with the given name, which should be a symbol or keyword. T
 {{NAME}} is not evaluated.
 
 <syntax>(@ STRING)</syntax>
-<syntax>(@ NAME)</syntax>
 <syntax>(@ RECEIVER SELECTOR ARGUMENT ...)</syntax>
 
 The {{@}} syntax has three different meanings, depending on the type and number of arguments:
-
-* {{(@ STRING)}} returns an instance of {{NSString}} and is similar to the {{@"..."}} syntax in Objective-C
-
-* {{(@ NAME)}} is equivalent to {{(object-ref self 'NAME)}}. Note that {{object-ref}} has a "setter", so code like {{(set! (@ myvar) ...)}} is completely valid.
 
 * {{(@ RECEIVER SYMBOL)}} is equivalent to {{(send RECEIVER SYMBOL)}}.
 
@@ -123,7 +115,8 @@ Returns the instance-variable named {{SYMBOL}} of the given instance.
 
 <procedure>(object-set! OBJECT SYMBOL X)</procedure>
 
-Assigns {{X}} to the instance-variable {{SYMBOL}} of the given instance.
+Assigns {{X}} to the instance-variable {{SYMBOL}} of the given instance. Alternatively you
+can also use the form {{(set! (object-ref OBJECT SYMBOL) X)}}.
 
 <variable>nil</variable>
 
@@ -134,10 +127,6 @@ The same as {{#f}} which is CHICKEN's representation of a NULL pointer.
 <class>Object</class>
 
 Holds a pointer to class {{Object}}.
-
-<class>NSObject</class>
-
-Holds a pointer to class {{NSObject}}.
 
 <procedure>(class? X)</procedure>
 
@@ -178,43 +167,6 @@ Returns a pointer to the selector object for the selector with the name {{STRING
 <procedure>(selector->string SELECTOR)</procedure>
 
 Returns the name of the given selector-pointer.
-
-==== NSString
-
-<class>NSString</class>
-
-Holds a pointer to the {{NSString}} class.
-
-<procedure>(string->NSString STRING)</procedure>
-
-Returns a new instance of class {{NSString}} with the same contents as {{STRING}}. {{STRING}} is
-assumed to have UTF-8 encoding.
-
-<procedure>(NSString->string NSSTRING)</procedure>
-
-Returns a Scheme string with the same contents as the {{NSString}}
-instance given in {{NSSTRING}}. The returned string will be UTF-8 encoded.
-
-==== Autorelease pools
-
-<procedure>(with-autorelease-pool THUNK)</procedure>
-
-Executes the 0-argument procedure {{THUNK}} and returns its results. During execution
-of {{THUNK}} a new {{NSAutoreleasePool}} will be active. Once {{THUNK}} returns the
-autorelease pool will be released.
-
-<procedure>(install-autorelease-pool)</procedure>
-
-Creates an {{NSAutoreleasePool}}. The pool will be released when
-the application terminates (normally). Unless the code using this Objective-C interface
-is running in an embedded application, it is recommended to install an autorelease pool
-before creating any objects.
-
-==== Miscellaneous functionality
-
-<procedure>(NSLog STRING)</procedure>
-
-Writes a log message.
 
 ==== Method-call read-syntax
 
