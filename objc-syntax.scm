@@ -46,7 +46,13 @@
   (lambda (x r c)
     (let* ((name (strip-syntax (cadr x)))
 	   (defs (parse-implementation name (strip-syntax (cddr x)) 'define-objc-implementation))
-	   (handlers (map (lambda _ (gensym (string-append "C___" (symbol->string name) "___handler"))) defs))
+	   (handlers (map (match-lambda
+			    ((sel . _)
+			     (gensym (string-append
+				      "C___" (symbol->string name) "___" 
+				      (string-translate (symbol->string sel) ":" "_")
+				      "___handler"))) )
+			  defs))
 	   (%begin (r 'begin))
 	   (%foreign-declare (r 'foreign-declare))
 	   (%define-external (r 'define-external)))
@@ -94,10 +100,6 @@
 (define-syntax @
   (lambda (x r c)
     (match x
-      ((_ (? string? s))
-       `(,(r 'string->NSString) ,s))	;XXX cache
-      ((_ sym)
-       `(,(r 'object-ref) self ',sym))
       ((_ recv args ...)
        (let-values (((sel args) (parse-selector-list args car+cdr '@)))
 	 `(,(r 'send) ,recv ,sel ,@args))))))
