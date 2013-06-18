@@ -67,6 +67,9 @@ syntax. In addition to the usual foreign type specifiers, the types
 {{id}}, {{class}} and {{SEL}} are also available and correspond to
 {{c-pointer}}.
 
+Note that this declaration is only valid inside the current
+compilation unit.
+
 This form may only be used in compiled code.
 
 <syntax>(define-objc-implementation NAME DEFINITION ...)</syntax>
