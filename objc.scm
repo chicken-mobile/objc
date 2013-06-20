@@ -32,6 +32,10 @@
 #include <objc/objc.h>
 #include <objc/runtime.h>
 #include <objc/message.h>
+#ifdef __APPLE__
+#include <Block.h>
+#include <dispatch/dispatch.h>
+#endif
 
 #ifdef __GNUSTEP__
 # define _NATIVE_OBJC_ECXEPTIONS
@@ -64,9 +68,11 @@ static void *objc_msg_lookup_super(struct objc_super *sup, void *sel)
 
 (bind #<<EOF
 
+void *block_copy(void *);
+void block_release(void *);
+
 void dcFree(DCCallVM *);
 
-void dcArgBool(DCCallVM *, int);
 void dcArgChar(DCCallVM *, char);
 void dcArgShort(DCCallVM *, short);
 void dcArgInt(DCCallVM *, int);
@@ -77,7 +83,6 @@ void dcArgDouble(DCCallVM *, double);
 void dcArgPointer(DCCallVM *, void *);
 
 ___safe void dcCallVoid(DCCallVM *, void *);
-___safe int dcCallBool(DCCallVM *, void *);
 ___safe char dcCallChar(DCCallVM *, void *);
 ___safe short dcCallShort(DCCallVM *, void *);
 ___safe int dcCallInt(DCCallVM *, void *);
@@ -89,7 +94,6 @@ ___safe void *dcCallPointer(DCCallVM *, void *);
 
 void *sel_registerName(char *);
 char *sel_getName(void *);
-char *object_getClassName(void *);
 void *object_getClass(void *);
 void *class_getInstanceMethod(void *, void *);
 void *class_getClassMethod(void *, void *);
@@ -143,7 +147,7 @@ static void ivar_double_set(Ivar *v, void *obj, int off, double x) { *((double *
 
 static char *get_method_description_types(void *mth) { 
 #ifdef __APPLE__
-  return method_getTypeEncoding(mth);
+  return (char *)method_getTypeEncoding(mth);
 #else
   return method_getDescription(mth)->types; 
 #endif
@@ -162,6 +166,28 @@ static void *lookup_message_for_superclass(void *s, void *sel) {
   sc.super_class = class_getSuperclass(object_getClass(s));
 #endif
   return objc_msg_lookup_super(&sc, sel);
+}
+
+___safe void *create_invocation_block(DCCallVM *vm, void *imp) { 
+#ifdef __APPLE__
+  void (^b)() = ^{ dcCallVoid(vm, imp); dcFree(vm); };
+  Block_copy(b);
+  return b;
+#else
+  fprintf(stderr, "\"@/block\" is not available on this platform.\n");
+  exit(1);
+#endif
+}
+
+___safe void dispatch_invocation_block(DCCallVM *vm, void *imp) { 
+#ifdef __APPLE__
+  dispatch_async(dispatch_get_main_queue(), 
+		 ^{ dcCallVoid(vm, imp); 
+	            dcFree(vm); });
+#else
+  fprintf(stderr, "\"@/main-thread\" is not available on this platform.\n");
+  exit(1);
+#endif
 }
 
 EOF
@@ -303,10 +329,11 @@ EOF
 	     r)))
 	(else (error "unsupported result type" types selector))))))
 
-(define (lookup-method receiver selector cache argc super?)
-  (define (make-caller receiver sel push)
-    (lambda args
-      (push (begin_call_setup) (cons receiver (cons sel args)))))
+(define (make-caller receiver sel push)
+  (lambda args
+    (push (begin_call_setup) (cons receiver (cons sel args)))))
+
+(define (lookup-method/call receiver selector cache argc super?)
   (let ((class (object_getClass (check-object receiver 'lookup-method))))
     (d "[" receiver " (" (class_getName class) ") " selector " - cache: " cache "]")
     (cond ((not class) (error "invalid object pointer" receiver selector))
@@ -330,8 +357,48 @@ EOF
 		     (##sys#setslot cache 1 selobj)
 		     (##sys#setslot cache 2 push)
 		     (d "[updated cache " cache "]"))
-		   call))
-	     (error "method not found" receiver selector))))))
+		   call)
+		 (error "method not found" receiver selector)))))))
+
+;; this one does not cache
+(define (lookup-method/block receiver selector argc super?)
+  (let ((class (object_getClass (check-object receiver 'lookup-method))))
+    (d "[(block) " receiver " (" (class_getName class) ") " selector "]")
+    (cond ((not class) (error "invalid object pointer" receiver selector))
+	  (else
+	   (let* ((sel (sel_registerName selector))
+		  (mth (get-method class sel)))
+	     (if mth
+		 (let* ((types (get_method_description_types mth))
+			(len (string-length types))
+			(imp ((if super? lookup_message_for_superclass objc_msg_lookup) receiver sel))
+			(selobj (make-selector sel))
+			(invoke (lambda (vm args) 
+				  (tag-pointer (create_invocation_block vm imp) 'block)))
+			(push (build-argument-passing types invoke selector))
+			(call (make-caller receiver selobj push)))
+		   call)
+		 (error "method not found" receiver selector)))))))
+
+;; this one does not cache as well
+(define (lookup-method/main-thread receiver selector argc super?)
+  (let ((class (object_getClass (check-object receiver 'lookup-method))))
+    (d "[(block) " receiver " (" (class_getName class) ") " selector "]")
+    (cond ((not class) (error "invalid object pointer" receiver selector))
+	  (else
+	   (let* ((sel (sel_registerName selector))
+		  (mth (get-method class sel)))
+	     (if mth
+		 (let* ((types (get_method_description_types mth))
+			(len (string-length types))
+			(imp ((if super? lookup_message_for_superclass objc_msg_lookup) receiver sel))
+			(selobj (make-selector sel))
+			(invoke (lambda (vm args)
+				  (tag-pointer (dispatch_invocation_block vm imp) 'block)))
+			(push (build-argument-passing types invoke selector))
+			(call (make-caller receiver selobj push)))
+		   call)
+		 (error "method not found" receiver selector)))))))
 
 (define (find-class name #!optional (err #t))
   (make-object
@@ -457,3 +524,11 @@ EOF
 ;;XXX why do these exist?
 (define ##objc#make-object make-object)
 (define ##objc#make-selector make-selector)
+
+(define (block-copy block)
+  (assert (tagged-pointer? block 'block) "not a block" block)
+  (tag-pointer (block_copy block) 'block))
+
+(define (block-release! block)
+  (assert (tagged-pointer? block 'block) "not a block" block)
+  (block_release block))

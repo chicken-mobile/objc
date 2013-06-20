@@ -83,8 +83,33 @@
 	 `(,(r 'let*) ((,%rec ,(if super 'self receiver))
 		       (,%sel ,(fmt #f (apply-cat (split-selector (strip-syntax msg)))))
 		       (,%cache (,%quote ,(make-vector 3 #f)))) ; #(CLASS SEL CALL)
-	   ((,(r 'lookup-method) ,%rec ,%sel ,%cache ,(length args) ,super)
-	    ,@args)))))))
+	   ((,(r 'lookup-method/call) ,%rec ,%sel ,%cache ,(length args) ,super) ,@args)))))))
+
+(define-syntax send/block
+  (lambda (x r c)
+    (match x
+      ((_ receiver msg args ...)
+       (let ((%rec (r 'rec))
+	     (%sel (r 'sel))
+	     (%quote (r 'quote))
+	     (%cache (r 'cache))
+	     (super (c 'super receiver)))
+	 `(,(r 'let*) ((,%rec ,(if super 'self receiver))
+		       (,%sel ,(fmt #f (apply-cat (split-selector (strip-syntax msg))))))
+	   ((,(r 'lookup-method/block) ,%rec ,%sel ,(length args) ,super) ,@args)))))))
+
+(define-syntax send/main-thread
+  (lambda (x r c)
+    (match x
+      ((_ receiver msg args ...)
+       (let ((%rec (r 'rec))
+	     (%sel (r 'sel))
+	     (%quote (r 'quote))
+	     (%cache (r 'cache))
+	     (super (c 'super receiver)))
+	 `(,(r 'let*) ((,%rec ,(if super 'self receiver))
+		       (,%sel ,(fmt #f (apply-cat (split-selector (strip-syntax msg))))))
+	   ((,(r 'lookup-method/main-thread) ,%rec ,%sel ,(length args) ,super) ,@args)))))))
 
 ;;XXX this could expand into "(foreign-value ...)" if in compilation mode
 (define-syntax @selector
@@ -103,3 +128,17 @@
       ((_ recv args ...)
        (let-values (((sel args) (parse-selector-list args car+cdr '@)))
 	 `(,(r 'send) ,recv ,sel ,@args))))))
+
+(define-syntax @/block
+  (lambda (x r c)
+    (match x
+      ((_ recv args ...)
+       (let-values (((sel args) (parse-selector-list args car+cdr '@)))
+	 `(,(r 'send/block) ,recv ,sel ,@args))))))
+
+(define-syntax @/main-thread
+  (lambda (x r c)
+    (match x
+      ((_ recv args ...)
+       (let-values (((sel args) (parse-selector-list args car+cdr '@)))
+	 `(,(r 'send/main-thread) ,recv ,sel ,@args))))))

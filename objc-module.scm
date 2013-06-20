@@ -10,6 +10,8 @@
 	      Object
 	      @selector
 	      @
+	      @/block
+	      @/main-thread
 	      class-of
 	      class?
 	      metaclass?
@@ -19,7 +21,11 @@
 	      selector?
 	      superclass-of
 	      nil
-	      (send lookup-method))
+	      block-copy
+	      block-release!
+	      (send lookup-method/call)
+	      (send/block lookup-method/block)
+	      (send/main-thread lookup-method/main-thread))
 
 (import scheme chicken)
 (include "objc.scm")
