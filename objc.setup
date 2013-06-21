@@ -1,10 +1,6 @@
 (use make utils posix)
 
 
-;;XXX detect whether GNUStep is installed or not
-(define has-gnustep #t)			
-
-
 (define cflags
   (cond-expand
     (macosx "-I.")
@@ -12,17 +8,18 @@
 
      ;;(with-input-from-pipe "gnustep-config --objc-flags" read-all)
 
-     ;; We use these instead - those GNUstep dumbasses added optimization- and warning flags to the output
+     ;; We use these instead - those GNUstep wizards added optimization- and warning flags to the output
      ;; of "gnustep-config" ...
-     (if has-gnustep
-	 (string-append
-	  " -fexceptions -fobjc-exceptions"
-	  " -D_NATIVE_OBJC_EXCEPTIONS -Wno-import --param=ssp-buffer-size=4"
-	  " -Wno-unused-variable -Wno-unused-but-set-variable -Wno-unused-function"
-	  " -fgnu-runtime")
-	 ""))))
+     (string-append
+      " -fexceptions -fobjc-exceptions"
+      " -D_NATIVE_OBJC_EXCEPTIONS -Wno-import --param=ssp-buffer-size=4"
+      " -Wno-unused-variable -Wno-unused-but-set-variable -Wno-unused-function"
+      " -fgnu-runtime"))))
 
-(define libs "-L. -ldyncall_s -L -lobjc -framework Cocoa")
+(define libs
+  (cond-expand
+    (macosx "-L. -ldyncall_s -L -lobjc -framework Cocoa")
+    (else "-L. -ldyncall_s -L -lobjc")))
 
 (make (("objc-compile-time.so" ("objc-compile-time.scm" "foreign-types.scm")
 	(compile -sJ -O3 -d0 objc-compile-time.scm)

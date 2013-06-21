@@ -63,13 +63,16 @@ static void *objc_msg_lookup_super(struct objc_super *sup, void *sel)
 
   return class_getMethodImplementation(c, sel);
 }
+#else
+static void *Block_copy(void *) { return NULL; }
+static void Block_release(void *) { return NULL; }
 #endif
 <#
 
 (bind #<<EOF
 
-void *block_copy(void *);
-void block_release(void *);
+void *Block_copy(void *);
+void Block_release(void *);
 
 void dcFree(DCCallVM *);
 
@@ -527,8 +530,8 @@ EOF
 
 (define (block-copy block)
   (assert (tagged-pointer? block 'block) "not a block" block)
-  (tag-pointer (block_copy block) 'block))
+  (tag-pointer (Block_copy block) 'block))
 
 (define (block-release! block)
   (assert (tagged-pointer? block 'block) "not a block" block)
-  (block_release block))
+  (Block_release block))
