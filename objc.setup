@@ -22,7 +22,7 @@
 	  " -fgnu-runtime")
 	 ""))))
 
-(define libs "-L. -ldyncall_s -L -lobjc")
+(define libs "-L. -ldyncall_s -L -lobjc -framework Cocoa")
 
 (make (("objc-compile-time.so" ("objc-compile-time.scm" "foreign-types.scm")
 	(compile -sJ -O3 -d0 objc-compile-time.scm)

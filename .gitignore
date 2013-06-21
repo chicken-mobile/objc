@@ -1,4 +1,5 @@
-objc
-objc*.so
+*.d
+*~
+*.so
 
-objc.import.scm
+*.import.*

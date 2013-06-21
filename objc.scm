@@ -32,6 +32,10 @@
 #include <objc/objc.h>
 #include <objc/runtime.h>
 #include <objc/message.h>
+#ifdef __APPLE__
+#include <Block.h>
+#include <dispatch/dispatch.h>
+#endif
 
 #ifdef __GNUSTEP__
 # define _NATIVE_OBJC_ECXEPTIONS
@@ -64,9 +68,11 @@ static void *objc_msg_lookup_super(struct objc_super *sup, void *sel)
 
 (bind #<<EOF
 
+void *block_copy(void *);
+void block_release(void *);
+
 void dcFree(DCCallVM *);
 
-void dcArgBool(DCCallVM *, int);
 void dcArgChar(DCCallVM *, char);
 void dcArgShort(DCCallVM *, short);
 void dcArgInt(DCCallVM *, int);
@@ -77,7 +83,6 @@ void dcArgDouble(DCCallVM *, double);
 void dcArgPointer(DCCallVM *, void *);
 
 ___safe void dcCallVoid(DCCallVM *, void *);
-___safe int dcCallBool(DCCallVM *, void *);
 ___safe char dcCallChar(DCCallVM *, void *);
 ___safe short dcCallShort(DCCallVM *, void *);
 ___safe int dcCallInt(DCCallVM *, void *);
@@ -89,7 +94,6 @@ ___safe void *dcCallPointer(DCCallVM *, void *);
 
 void *sel_registerName(char *);
 char *sel_getName(void *);
-char *object_getClassName(void *);
 void *object_getClass(void *);
 void *class_getInstanceMethod(void *, void *);
 void *class_getClassMethod(void *, void *);
@@ -143,7 +147,7 @@ static void ivar_double_set(Ivar *v, void *obj, int off, double x) { *((double *
 
 static char *get_method_description_types(void *mth) { 
 #ifdef __APPLE__
-  return method_getTypeEncoding(mth);
+  return (char *)method_getTypeEncoding(mth);
 #else
   return method_getDescription(mth)->types; 
 #endif
@@ -162,6 +166,28 @@ static void *lookup_message_for_superclass(void *s, void *sel) {
   sc.super_class = class_getSuperclass(object_getClass(s));
 #endif
   return objc_msg_lookup_super(&sc, sel);
+}
+
+___safe void *create_invocation_block(DCCallVM *vm, void *imp) { 
+#ifdef __APPLE__
+  void (^b)() = ^{ dcCallVoid(vm, imp); dcFree(vm); };
+  Block_copy(b);
+  return b;
+#else
+  fprintf(stderr, "\"@/block\" is not available on this platform.\n");
+  exit(1);
+#endif
+}
+
+___safe void dispatch_invocation_block(DCCallVM *vm, void *imp) { 
+#ifdef __APPLE__
+  dispatch_async(dispatch_get_main_queue(), 
+		 ^{ dcCallVoid(vm, imp); 
+	            dcFree(vm); });
+#else
+  fprintf(stderr, "\"@/main-thread\" is not available on this platform.\n");
+  exit(1);
+#endif
 }
 
 EOF
@@ -191,32 +217,123 @@ EOF
 	 (class_getInstanceMethod class sel)))
     (else (class_getInstanceMethod class sel))))
 
-(define (lookup-method receiver selector cache argc super?)
-  (define (skip p str)
-    (let ((len (string-length str)))
-      (let loop ((i p) (d #f) (beyond #f))
-	(if (fx>= i len)
+(define (skip-type p str)
+  (let ((len (string-length str)))
+    (let loop ((i p) (d #f) (beyond #f))
+      (if (fx>= i len)
+	  (if d
+	      (error 'lookup-method "incomplete signature" str)
+	      len)
+	  (let ((c (string-ref str i)))
 	    (if d
-		(error 'lookup-method "incomplete signature" str selector receiver)
-		len)
-	    (let ((c (string-ref str i)))
-	      (if d
-		  (loop (fx+ i 1) (not (char=? d c)) #t)
-		  (case c
-		    ((#\r #\R #\o #\O #\V #\n #\N #\^)
-		     (if beyond
-			 i
-			 (loop (fx+ i 1) #f #f)))
-		    ((#\() (loop (fx+ i 1) #\) #f))
-		    ((#\{) (loop (fx+ i 1) #\} #f))
-		    ((#\[) (loop (fx+ i 1) #\] #f))
-		    (else
-		     (cond ((char-numeric? c) (loop (fx+ i 1) #f beyond))
-			   (beyond i)
-			   (else (loop (fx+ i 1) #f #t)))))))))))
-  (define (make-caller receiver sel push)
-    (lambda args
-      (push (begin_call_setup) (cons receiver (cons sel args)))))
+		(loop (fx+ i 1) (not (char=? d c)) #t)
+		(case c
+		  ((#\r #\R #\o #\O #\V #\n #\N #\^)
+		   (if beyond
+		       i
+		       (loop (fx+ i 1) #f #f)))
+		  ((#\() (loop (fx+ i 1) #\) #f))
+		  ((#\{) (loop (fx+ i 1) #\} #f))
+		  ((#\[) (loop (fx+ i 1) #\] #f))
+		  (else
+		   (cond ((char-numeric? c) (loop (fx+ i 1) #f beyond))
+			 (beyond i)
+			 (else (loop (fx+ i 1) #f #t)))))))))))
+
+(define (build-argument-passing types invoke selector)
+  (let-syntax ((dpush
+		(syntax-rules ()
+		  ((_ op k)
+		   (lambda (vm args)
+		     (op vm (car args))
+		     (k vm (cdr args)))))))
+    (let ((len (string-length types)))
+      (let loop ((i (skip-type 0 types)))
+	(if (fx>= i len)
+	    invoke
+	    (let ((t (string-ref types i))
+		  (k (loop (skip-type i types))))
+	      (case t
+		((#\c #\C)
+		 ;; hack around absent "bool" type
+		 (lambda (vm args)
+		   (let ((x (car args)))
+		     (dcArgChar
+		      vm
+		      (case x
+			((#f) #\x00)
+			((#t) #\x01)
+			(else x)))
+		     (k vm (cdr args)))))
+		((#\s #\S) (dpush dcArgShort k))
+		((#\b #\i #\I) (dpush dcArgInt k))
+		((#\l #\L) (dpush dcArgLong k))
+		((#\Q #\q) (dpush dcArgLongLong k))
+		((#\f) (dpush dcArgFloat k))
+		((#\d #\D) (dpush dcArgDouble k))
+		((#\*) 
+		 (lambda (vm args)
+		   (push_string_argument vm (car args))
+		   (k vm (cdr args))))
+		((#\r #\R #\n #\N #\o #\O #\V)
+		 (loop (fx+ i 1)))
+		((#\^) (dpush dcArgPointer k))
+		((#\:) (lambda (vm args)
+			 (dcArgPointer vm (check-selector (car args) 'lookup-method))
+			 (k vm (cdr args))))
+		((#\@ #\#) 
+		 (lambda (vm args)
+		   (dcArgPointer vm (check-object (car args) 'lookup-method))
+		   (k vm (cdr args))))
+		(else
+		 (error "unsupported argument type" types 
+			(string-append (make-string i #\space) "^") ; aren't we clever?
+			selector)))))))))
+
+(define (build-invocation types imp selector)
+  (let-syntax ((dcall
+		(syntax-rules ()
+		  ((_ op imp)
+		   (lambda (vm args)
+		     (let ((r (op vm imp)))
+		       (dcFree vm)
+		       r))))))
+    (let loop ((i 0))
+      (case (string-ref types i)
+	((#\v)
+	 (lambda (vm args)
+	   (dcCallVoid vm imp)))
+	((#\c #\C) 
+	 (lambda (vm args)
+	   ;; hack around absent "bool" type
+	   (let ((r (dcCallChar vm imp)))
+	     (dcFree vm)
+	     (if (char=? #\x00 r) #f r))))
+	((#\s #\S) (dcall dcCallShort imp))
+	((#\b #\i #\I) (dcall dcCallInt imp))
+	((#\l #\L) (dcall dcCallLong imp))
+	((#\q #\Q) (dcall dcCallLongLong imp))
+	((#\f) (dcall dcCallFloat imp))
+	((#\d #\D) (dcall dcCallDouble imp))
+	((#\* #\%) (dcall call_with_string_result imp))
+	((#\r #\R #\n #\N #\o #\O #\V) (loop (fx+ i 1)))
+	((#\^) (dcall dcCallPointer imp))
+	((#\:) (lambda (vm args)
+		 (let ((r (make-selector (dcCallPointer vm imp))))
+		   (dcFree vm)
+		   r)))
+	((#\@ #\#)
+	 (lambda (vm args) 
+	   (let ((r (make-object (dcCallPointer vm imp))))
+	     (dcFree vm)
+	     r)))
+	(else (error "unsupported result type" types selector))))))
+
+(define (make-caller receiver sel push)
+  (lambda args
+    (push (begin_call_setup) (cons receiver (cons sel args)))))
+
+(define (lookup-method/call receiver selector cache argc super?)
   (let ((class (object_getClass (check-object receiver 'lookup-method))))
     (d "[" receiver " (" (class_getName class) ") " selector " - cache: " cache "]")
     (cond ((not class) (error "invalid object pointer" receiver selector))
@@ -227,104 +344,60 @@ EOF
 	   (let* ((sel (sel_registerName selector))
 		  (mth (get-method class sel)))
 	     (if mth
-		 (let-syntax ((dpush
-			       (syntax-rules ()
-				 ((_ op k)
-				  (lambda (vm args)
-				    (op vm (car args))
-				    (k vm (cdr args))))))
-			      (dcall
-			       (syntax-rules ()
-				 ((_ op imp)
-				  (lambda (vm args)
-				    (let ((r (op vm imp)))
-				      (dcFree vm)
-				      r))))))
-		   (let* ((types (get_method_description_types mth))
-			  ;(_ (print "types: " selector " - " types))
-			  (len (string-length types))
-			  (imp ((if super? lookup_message_for_superclass objc_msg_lookup) receiver sel))
-			  (selobj (make-selector sel))
-			  (invoke (let loop ((i 0))
-				    (case (string-ref types i)
-				      ((#\v)
-				       (lambda (vm args)
-					 (dcCallVoid vm imp)))
-				      ((#\c #\C) 
-				       (lambda (vm args)
-					 ;; hack around absent "bool" type
-					 (let ((r (dcCallChar vm imp)))
-					   (dcFree vm)
-					   (if (char=? #\x00 r) #f r))))
-				      ((#\s #\S) (dcall dcCallShort imp))
-				      ((#\b #\i #\I) (dcall dcCallInt imp))
-				      ((#\l #\L) (dcall dcCallLong imp))
-				      ((#\q #\Q) (dcall dcCallLongLong imp))
-				      ((#\f) (dcall dcCallFloat imp))
-				      ((#\d #\D) (dcall dcCallDouble imp))
-				      ((#\* #\%) (dcall call_with_string_result imp))
-				      ((#\r #\R #\n #\N #\o #\O #\V) (loop (fx+ i 1)))
-				      ((#\^) (dcall dcCallPointer imp))
-				      ((#\:) (lambda (vm args)
-					       (let ((r (make-selector (dcCallPointer vm imp))))
-						 (dcFree vm)
-						 r)))
-				      ((#\@ #\#)
-				       (lambda (vm args) 
-					 (let ((r (make-object (dcCallPointer vm imp))))
-					   (dcFree vm)
-					   r)))
-				      (else (error "unsupported result type" types selector)))))
-			  ;;XXX expand calls to 0-4 args completely
-			  (push
-			   (let loop ((i (skip 0 types)))
-			     (if (fx>= i len)
-				 invoke
-				 (let ((t (string-ref types i))
-				       (k (loop (skip i types))))
-				   (case t
-				     ((#\c #\C)
-				      ;; hack around absent "bool" type
-				      (lambda (vm args)
-					(let ((x (car args)))
-					  (dcArgChar
-					   vm
-					   (case x
-					     ((#f) #\x00)
-					     ((#t) #\x01)
-					     (else x)))
-					  (k vm (cdr args)))))
-				     ((#\s #\S) (dpush dcArgShort k))
-				     ((#\b #\i #\I) (dpush dcArgInt k))
-				     ((#\l #\L) (dpush dcArgLong k))
-				     ((#\Q #\q) (dpush dcArgLongLong k))
-				     ((#\f) (dpush dcArgFloat k))
-				     ((#\d #\D) (dpush dcArgDouble k))
-				     ((#\*) 
-				      (lambda (vm args)
-					(push_string_argument vm (car args))
-					(k vm (cdr args))))
-				     ((#\r #\R #\n #\N #\o #\O #\V)
-				      (loop (fx+ i 1)))
-				     ((#\^) (dpush dcArgPointer k))
-				     ((#\:) (lambda (vm args)
-					      (dcArgPointer vm (check-selector (car args) 'lookup-method))
-					      (k vm (cdr args))))
-				     ((#\@ #\#) 
-				      (lambda (vm args)
-					(dcArgPointer vm (check-object (car args) 'lookup-method))
-					(k vm (cdr args))))
-				     (else
-				      (error "unsupported argument type" types 
-					     (string-append (make-string i #\space) "^") ; aren't we clever?
-					     selector)))))))
-			  (call (make-caller receiver selobj push)))
-		     (when *enable-inline-cache*
-		       (##sys#setslot cache 0 class)
-		       (##sys#setslot cache 1 selobj)
-		       (##sys#setslot cache 2 push)
-		       (d "[updated cache " cache "]"))
-		     call))
+		 (let* ((types (get_method_description_types mth))
+					;(_ (print "types: " selector " - " types))
+			(len (string-length types))
+			(imp ((if super? lookup_message_for_superclass objc_msg_lookup) receiver sel))
+			(selobj (make-selector sel))
+			(invoke (build-invocation types imp selector))
+			(push (build-argument-passing types invoke selector))
+			(call (make-caller receiver selobj push)))
+		   (when *enable-inline-cache*
+		     (##sys#setslot cache 0 class)
+		     (##sys#setslot cache 1 selobj)
+		     (##sys#setslot cache 2 push)
+		     (d "[updated cache " cache "]"))
+		   call)
+		 (error "method not found" receiver selector)))))))
+
+;; this one does not cache
+(define (lookup-method/block receiver selector argc super?)
+  (let ((class (object_getClass (check-object receiver 'lookup-method))))
+    (d "[(block) " receiver " (" (class_getName class) ") " selector "]")
+    (cond ((not class) (error "invalid object pointer" receiver selector))
+	  (else
+	   (let* ((sel (sel_registerName selector))
+		  (mth (get-method class sel)))
+	     (if mth
+		 (let* ((types (get_method_description_types mth))
+			(len (string-length types))
+			(imp ((if super? lookup_message_for_superclass objc_msg_lookup) receiver sel))
+			(selobj (make-selector sel))
+			(invoke (lambda (vm args) 
+				  (tag-pointer (create_invocation_block vm imp) 'block)))
+			(push (build-argument-passing types invoke selector))
+			(call (make-caller receiver selobj push)))
+		   call)
+		 (error "method not found" receiver selector)))))))
+
+;; this one does not cache as well
+(define (lookup-method/main-thread receiver selector argc super?)
+  (let ((class (object_getClass (check-object receiver 'lookup-method))))
+    (d "[(block) " receiver " (" (class_getName class) ") " selector "]")
+    (cond ((not class) (error "invalid object pointer" receiver selector))
+	  (else
+	   (let* ((sel (sel_registerName selector))
+		  (mth (get-method class sel)))
+	     (if mth
+		 (let* ((types (get_method_description_types mth))
+			(len (string-length types))
+			(imp ((if super? lookup_message_for_superclass objc_msg_lookup) receiver sel))
+			(selobj (make-selector sel))
+			(invoke (lambda (vm args)
+				  (tag-pointer (dispatch_invocation_block vm imp) 'block)))
+			(push (build-argument-passing types invoke selector))
+			(call (make-caller receiver selobj push)))
+		   call)
 		 (error "method not found" receiver selector)))))))
 
 (define (find-class name #!optional (err #t))
@@ -412,17 +485,11 @@ EOF
   (assert (selector? x) "not a selector" x)
   x)
 
-(define (string->selector str)
-  (tag-pointer (sel_registerName str) 'objective-c-selector))
-
 (define (selector->string sel)
   (sel_getName (check-selector sel 'selector->string)))
 
 (define (string->selector str)
   (make-selector (sel_registerName str)))
-
-(define (selector->string sel)
-  (sel_getName (check-selector sel 'selector->string)))
 
 (define (class? x)
   (and x
@@ -457,3 +524,11 @@ EOF
 ;;XXX why do these exist?
 (define ##objc#make-object make-object)
 (define ##objc#make-selector make-selector)
+
+(define (block-copy block)
+  (assert (tagged-pointer? block 'block) "not a block" block)
+  (tag-pointer (block_copy block) 'block))
+
+(define (block-release! block)
+  (assert (tagged-pointer? block 'block) "not a block" block)
+  (block_release block))
