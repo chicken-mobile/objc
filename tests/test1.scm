@@ -1,5 +1,6 @@
 (use test objc)
 
+
 (test-begin)
 
 (define NSAutoreleasePool (find-class "NSAutoreleasePool"))
