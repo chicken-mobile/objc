@@ -12,3 +12,4 @@
    (else "")))
 
 (compile-file "test1.scm" options: `("-objc" ,objcflags))
+(compile-file "test2.scm" options: `("-objc" ,objcflags "-lpthread"))

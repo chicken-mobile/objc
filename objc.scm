@@ -2,7 +2,7 @@
 
 
 (import foreign)
-(use lolevel data-structures ports)
+(use lolevel data-structures ports concurrent-native-callbacks)
 
 (begin-for-syntax
  (require-library objc-compile-time))
@@ -24,7 +24,6 @@
 ;(declare (unsafe))
 
 (import bind)
-(use lolevel)
 
 
 #>

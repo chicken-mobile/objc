@@ -55,7 +55,8 @@
 			  defs))
 	   (%begin (r 'begin))
 	   (%foreign-declare (r 'foreign-declare))
-	   (%define-external (r 'define-external)))
+	   (%define-external (r 'define-external))
+	   (%define-synchronous-concurrent-native-callback (r 'define-synchronous-concurrent-native-callback)))
       `(,%begin
 	(,%foreign-declare
 	 ,(format-implementation-definition name defs handlers))
@@ -63,12 +64,15 @@
 		 (match def
 		   ((sel i rtype args body)
 		    ;;XXX unfortunately this is externally visible
-		    `(,%define-external (,h (id self)     ; intentionally unhygienic
-					    ,@(map (match-lambda
-						     ((name type) (list type name)))
-						   args))
-					,rtype
-					,@body))))
+		    `(,(if (memq i '(+/async -/async))
+			   %define-synchronous-concurrent-native-callback
+			   %define-external)
+		      (,h (c-pointer self)     ; intentionally unhygienic
+			  ,@(map (match-lambda
+				   ((name type) (list type name)))
+				 args))
+		      ,(if (eq? 'id rtype) 'c-pointer rtype)
+		      ,@body))))
 	       defs handlers)))))		   
       
 (define-syntax send

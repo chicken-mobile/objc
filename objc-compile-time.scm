@@ -14,7 +14,6 @@
 (import scheme chicken matchable)
 (use miscmacros fmt srfi-1 data-structures)
 
-
 (include "foreign-types.scm")
 
 (define (append-keywords m1 . ms)
@@ -44,10 +43,10 @@
 	(push! `(,name field ,type ,prot) def))
        ((and p (or '@protected '@public '@private))
 	(set! prot p))
-       (((and i (or '- '+)) (rtype) name+args ...)
+       (((and i (or '- '+ '-/async '+/async)) (rtype) name+args ...)
 	(let-values (((sel args) (parse-selector-list name+args type+name loc)))
 	  (push! (cons* sel i rtype args) def)))
-       (((and i (or '- '+)) name+args ...)
+       (((and i (or '- '+ '-/async '+/async)) name+args ...)
 	(let-values (((sel args) (parse-selector-list name+args type+name loc)))
 	  (push! (cons* sel i 'id args) def)))
        (x (syntax-error loc "invalid declaration" class x)))
@@ -64,10 +63,10 @@
     (let loop ()
       (unless (null? form)
 	(match (pop! form)
-	  ((((and i (or '- '+)) (rtype) name+args ...) body ...)
+	  ((((and i (or '- '+ '-/async '+/async)) (rtype) name+args ...) body ...)
 	   (let-values (((sel args) (parse-selector-list name+args type+name loc)))
 	     (push! (list sel i rtype args body) def)))
-	  ((((and i (or '- '+)) name+args ...) body ...)
+	  ((((and i (or '- '+ '-/async '+/async)) name+args ...) body ...)
 	   (let-values (((sel args) (parse-selector-list name+args type+name loc)))
 	     (push! (list sel i 'id args body) def)))
 	  (x (syntax-error loc "invalid definition" class x)))
@@ -105,7 +104,12 @@
 	   ((_ 'field _ _) #f)
 	   ((sel i rtype args ...)
 	    (let ((sels (split-selector sel)))
-	      (fmt #f i "(" (objc-foreign-type-declaration rtype "") ")"
+	      (fmt #f 
+		   (case i
+		     ((+/async) '+)
+		     ((-/async) '-)
+		     (else i))
+		   "(" (objc-foreign-type-declaration rtype "") ")"
 		   (if (null? args)
 		       (car sels)
 		       (apply-cat
@@ -137,7 +141,12 @@
 	       (match def
 		 ((sel i rtype args _)
 		  (let ((sels (split-selector sel)))
-		    (fmt #f i "(" (objc-foreign-type-declaration rtype "") ")" 
+		    (fmt #f 
+			 (case i
+			   ((+/async) '+)
+			   ((-/async) '-)
+			   (else i))
+			 "(" (objc-foreign-type-declaration rtype "") ")" 
 			 (if (null? args)
 			     (car sels)
 			     (apply-cat

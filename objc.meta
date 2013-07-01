@@ -3,5 +3,5 @@
  (synopsis "An interface to Objective-C")
  (category ffi)
  (license "BSD")
- (foreign-depends dyncall gnustep)
- (author "bevuta IT GmbH (Felix Winkelmann)"))
+ (foreign-depends dyncall gnustep concurrent-native-callbacks)
+ (author "felix winkelmann"))
