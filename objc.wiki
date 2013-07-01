@@ -85,24 +85,43 @@ current receiver.
 
 This form can only be used in compiled code.
 
+==== Method invocation
+
 <syntax>(send RECEIVER SELECTOR ARGUMENT ...)</syntax>
 
 Sends the message given in the symbol or keyword {{SELECTOR}} to the object {{RECEIVER}}
 with the given arguments and returns its result.
+
+<syntax>(send/block RECEIVER SELECTOR ARGUMENT ...)</syntax>
+
+Returns a C [[http://developer.apple.com/library/ios/#documentation/Cocoa/Conceptual/Blocks/Articles/00_Introduction.html#//apple_ref/doc/uid/TP40007502-CH1-SW1|block]] pointer, that, when invoked will send the message with the arguments given.
+Note that the receiver and the arguments are evaluated when the block is created. The returned
+block is heap-allocated. Use {{block-release!}} to release the memory.
+
+This syntax is only available on Mac OS X / iOS.
+
+<syntax>(send/main-thread RECEIVER SELECTOR ARGUMENT ...)</syntax>
+
+Creates a C block wrapping the method-invocation and adds it to the [[http://developer.apple.com/library/ios/#documentation/General/Conceptual/ConcurrencyProgrammingGuide/OperationQueues/OperationQueues.html#//apple_ref/doc/uid/TP40008091-CH102-SW1|dispatch queue]] of the main thread.
+
+This syntax is only available on Mac OS X / iOS.
 
 <syntax>(@selector NAME)</syntax>
 
 Returns the selector with the given name, which should be a symbol or keyword. The
 {{NAME}} is not evaluated.
 
-<syntax>(@ STRING)</syntax>
 <syntax>(@ RECEIVER SELECTOR ARGUMENT ...)</syntax>
+<syntax>(@/block RECEIVER SELECTOR ARGUMENT ...)</syntax>
+<syntax>(@/main-thread RECEIVER SELECTOR ARGUMENT ...)</syntax>
 
-The {{@}} syntax has three different meanings, depending on the type and number of arguments:
+A slightly more convenient syntax for sending messages:
 
 * {{(@ RECEIVER SYMBOL)}} is equivalent to {{(send RECEIVER SYMBOL)}}.
 
 * {{(@ RECEIVER KEYWORD1 ARGUMENT1 ...)}} is equivalent to {{(send RECEIVER KEYWORD1:KEYWORD2:... ARGUMENT1 ARGUMENT2 ...)}}. The receiver may be the special variable {{super}} which sends to a message to {{self}} but starts the message-lookup in the superclass of the receiver (this is only valid inside a method-implementation).
+
+{{@/block}} and {{@/main-thead}} have the obvious meaning and are only available on Mac OS X / iOS.
 
 ==== Objects
 
@@ -187,6 +206,21 @@ The implementation of asychronously callable methods uses the [[concurrent-nativ
 internally.
 
 Note: calling such a method from the same thread will block indefinitely.
+==== Blocks
+
+<procedure>(block-copy BLOCK)</procedure>
+
+Allocates and copies the block referenced to by the block-pointer
+{{BLOCK}}, which is either the result of claling {{@/block ...)}} or
+{{block-copy}}. The copied block is returned.
+
+On platforms other than Mac OS X / iOS, this procedure does nothing and returns {{#f}}.
+
+<procedure>(block-release! BLOCK)</procedure>
+
+Releases the memory occupied by the previously copied block {{BLOCK}}.
+
+On platforms other than Mac OS X / iOS, this procedure does nothing.
 
 ==== Method-call read-syntax
 

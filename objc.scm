@@ -63,8 +63,8 @@ static void *objc_msg_lookup_super(struct objc_super *sup, void *sel)
   return class_getMethodImplementation(c, sel);
 }
 #else
-static void *Block_copy(void *) { return NULL; }
-static void Block_release(void *) { return NULL; }
+static void *Block_copy(void *x) { return NULL; }
+static void Block_release(void *x) {}
 #endif
 <#
 
