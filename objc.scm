@@ -120,6 +120,10 @@ ___safe static char *call_with_string_result(DCCallVM *vm, void *ptr) {
 
 static void push_string_argument(DCCallVM *vm, char *ptr) { dcArgPointer(vm, ptr); }
 
+static void push_pointer_vector_argument(DCCallVM *vm, ___scheme_value ptr) { 
+  dcArgPointer(vm, C_data_pointer(C_block_item(ptr, 2))); /* "buf" slot */
+}
+
 static DCCallVM *begin_call_setup() { 
   DCCallVM *vm = dcNewCallVM(4096);
   dcMode(vm, DC_CALL_C_DEFAULT);
@@ -279,7 +283,13 @@ EOF
 		   (k vm (cdr args))))
 		((#\r #\R #\n #\N #\o #\O #\V)
 		 (loop (fx+ i 1)))
-		((#\^) (dpush dcArgPointer k))
+		((#\^) 
+		 (lambda (vm args)
+		   (let ((x (car args)))
+		     (if (pointer-vector? x)
+			 (push_pointer_vector_argument vm x)
+			 (dcArgPointer vm x))
+		     (k vm (cdr args)))))
 		((#\:) (lambda (vm args)
 			 (dcArgPointer vm (check-selector (car args) 'lookup-method))
 			 (k vm (cdr args))))
