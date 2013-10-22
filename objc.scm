@@ -118,10 +118,30 @@ ___safe static char *call_with_string_result(DCCallVM *vm, void *ptr) {
   return dcCallPointer(vm, ptr); 
 }
 
-static void push_string_argument(DCCallVM *vm, char *ptr) { dcArgPointer(vm, ptr); }
+static void *push_string_argument(DCCallVM *vm, char *ptr) {
+  int len = C_strlen(ptr);
+  char *tmp = C_malloc(len + 1);
+  tmp[ len ] = '\0';
+  memcpy(tmp, ptr, len);
+  dcArgPointer(vm, tmp);
+  return tmp; 
+}
 
-static void push_pointer_vector_argument(DCCallVM *vm, ___scheme_value ptr) { 
-  dcArgPointer(vm, C_data_pointer(C_block_item(ptr, 2))); /* "buf" slot */
+static void release_temporary_storage(___scheme_value lst)
+{
+  while(lst != C_SCHEME_END_OF_LIST) {
+    void *tmp = C_c_pointer_nn(C_u_i_car(lst));
+    C_free(tmp);
+    lst = C_u_i_cdr(lst);
+  }
+}
+
+static void *push_pointer_vector_argument(DCCallVM *vm, ___scheme_value ptr) { 
+  int len = C_header_size(ptr);
+  void *tmp = C_malloc(len * sizeof(void *)); /* "buf" slot */
+  memcpy(tmp, C_data_pointer(C_block_item(ptr, 2)), len * sizeof(void *));
+  dcArgPointer(vm, tmp);
+  return tmp;
 }
 
 static DCCallVM *begin_call_setup() { 
@@ -174,9 +194,16 @@ static void *lookup_message_for_superclass(void *s, void *sel) {
   return objc_msg_lookup_super(&sc, sel);
 }
 
-___safe void *create_invocation_block(DCCallVM *vm, void *imp) { 
+___safe void *create_invocation_block(DCCallVM *vm, void *imp, ___scheme_value lst) { 
+  void *root = CHICKEN_new_gc_root();
+  CHICKEN_gc_root_set(root, lst);
 #ifdef __APPLE__
-  void (^b)() = ^{ dcCallVoid(vm, imp); dcFree(vm); };
+  void (^b)() = ^{ 
+    dcCallVoid(vm, imp); 
+    dcFree(vm);
+    release_temporary_storage(CHICKEN_gc_root_ref(root));
+    CHICKEN_delete_gc_root(root);
+  };
   Block_copy(b);
   return b;
 #else
@@ -185,11 +212,17 @@ ___safe void *create_invocation_block(DCCallVM *vm, void *imp) {
 #endif
 }
 
-___safe void dispatch_invocation_block(DCCallVM *vm, void *imp) { 
+___safe void dispatch_invocation_block(DCCallVM *vm, void *imp, ___scheme_value lst) { 
+  void *root = CHICKEN_new_gc_root();
+  CHICKEN_gc_root_set(root, lst);
 #ifdef __APPLE__
   dispatch_async(dispatch_get_main_queue(), 
-		 ^{ dcCallVoid(vm, imp); 
-	            dcFree(vm); });
+		 ^{ 
+		    dcCallVoid(vm, imp); 
+	            dcFree(vm); 
+                    release_temporary_storage(CHICKEN_gc_root_ref(root));
+                    CHICKEN_delete_gc_root(root);
+                  });
 #else
   fprintf(stderr, "\"@/main-thread\" is not available on this platform.\n");
   exit(1);
@@ -250,9 +283,9 @@ EOF
   (let-syntax ((dpush
 		(syntax-rules ()
 		  ((_ op k)
-		   (lambda (vm args)
+		   (lambda (vm args rls)
 		     (op vm (car args))
-		     (k vm (cdr args)))))))
+		     (k vm (cdr args) rls))))))
     (let ((len (string-length types)))
       (let loop ((i (skip-type 0 types)))
 	(if (fx>= i len)
@@ -262,7 +295,7 @@ EOF
 	      (case t
 		((#\c #\C)
 		 ;; hack around absent "bool" type
-		 (lambda (vm args)
+		 (lambda (vm args rls)
 		   (let ((x (car args)))
 		     (dcArgChar
 		      vm
@@ -270,7 +303,7 @@ EOF
 			((#f) #\x00)
 			((#t) #\x01)
 			(else x)))
-		     (k vm (cdr args)))))
+		     (k vm (cdr args) rls))))
 		((#\s #\S) (dpush dcArgShort k))
 		((#\b #\i #\I) (dpush dcArgInt k))
 		((#\l #\L) (dpush dcArgLong k))
@@ -278,25 +311,27 @@ EOF
 		((#\f) (dpush dcArgFloat k))
 		((#\d #\D) (dpush dcArgDouble k))
 		((#\*) 
-		 (lambda (vm args)
-		   (push_string_argument vm (car args))
-		   (k vm (cdr args))))
+		 (lambda (vm args rls)
+		   (let ((tmp (push_string_argument vm (car args))))
+		     (k vm (cdr args) (cons tmp rls)))))
 		((#\r #\R #\n #\N #\o #\O #\V)
 		 (loop (fx+ i 1)))
 		((#\^) 
-		 (lambda (vm args)
+		 (lambda (vm args rls)
 		   (let ((x (car args)))
-		     (if (pointer-vector? x)
-			 (push_pointer_vector_argument vm x)
-			 (dcArgPointer vm x))
-		     (k vm (cdr args)))))
-		((#\:) (lambda (vm args)
+		     (cond ((pointer-vector? x)
+			    (let ((tmp (push_pointer_vector_argument vm x)))
+			      (k vm (cdr args) (cons tmp rls))))
+			   (else
+			    (dcArgPointer vm x)
+			   (k vm (cdr args) rls))))))
+		((#\:) (lambda (vm args rls)
 			 (dcArgPointer vm (check-selector (car args) 'lookup-method))
-			 (k vm (cdr args))))
+			 (k vm (cdr args) rls)))
 		((#\@ #\#) 
-		 (lambda (vm args)
+		 (lambda (vm args rls)
 		   (dcArgPointer vm (check-object (car args) 'lookup-method))
-		   (k vm (cdr args))))
+		   (k vm (cdr args) rls)))
 		(else
 		 (error "unsupported argument type" types 
 			(string-append (make-string i #\space) "^") ; aren't we clever?
@@ -306,20 +341,23 @@ EOF
   (let-syntax ((dcall
 		(syntax-rules ()
 		  ((_ op imp)
-		   (lambda (vm args)
+		   (lambda (vm args rls)
 		     (let ((r (op vm imp)))
 		       (dcFree vm)
+		       (release_temporary_storage rls)
 		       r))))))
     (let loop ((i 0))
       (case (string-ref types i)
 	((#\v)
-	 (lambda (vm args)
-	   (dcCallVoid vm imp)))
+	 (lambda (vm args rls)
+	   (dcCallVoid vm imp)
+	   (release_temporary_storage rls)))
 	((#\c #\C) 
-	 (lambda (vm args)
+	 (lambda (vm args rls)
 	   ;; hack around absent "bool" type
 	   (let ((r (dcCallChar vm imp)))
 	     (dcFree vm)
+	     (release_temporary_storage rls)
 	     (if (char=? #\x00 r) #f r))))
 	((#\s #\S) (dcall dcCallShort imp))
 	((#\b #\i #\I) (dcall dcCallInt imp))
@@ -330,20 +368,22 @@ EOF
 	((#\* #\%) (dcall call_with_string_result imp))
 	((#\r #\R #\n #\N #\o #\O #\V) (loop (fx+ i 1)))
 	((#\^) (dcall dcCallPointer imp))
-	((#\:) (lambda (vm args)
+	((#\:) (lambda (vm args rls)
 		 (let ((r (make-selector (dcCallPointer vm imp))))
 		   (dcFree vm)
+		   (release_temporary_storage rls)
 		   r)))
 	((#\@ #\#)
-	 (lambda (vm args) 
+	 (lambda (vm args rls) 
 	   (let ((r (make-object (dcCallPointer vm imp))))
 	     (dcFree vm)
+	     (release_temporary_storage rls)
 	     r)))
 	(else (error "unsupported result type" types selector))))))
 
 (define (make-caller receiver sel push)
   (lambda args
-    (push (begin_call_setup) (cons receiver (cons sel args)))))
+    (push (begin_call_setup) (cons receiver (cons sel args)) '())))
 
 (define (lookup-method/call receiver selector cache argc super?)
   (let ((class (object_getClass (check-object receiver 'lookup-method))))
@@ -357,7 +397,7 @@ EOF
 		  (mth (get-method class sel)))
 	     (if mth
 		 (let* ((types (get_method_description_types mth))
-					;(_ (print "types: " selector " - " types))
+			;;(_ (print "types: " selector " - " types))
 			(len (string-length types))
 			(imp ((if super? lookup_message_for_superclass objc_msg_lookup) receiver sel))
 			(selobj (make-selector sel))
@@ -385,8 +425,8 @@ EOF
 			(len (string-length types))
 			(imp ((if super? lookup_message_for_superclass objc_msg_lookup) receiver sel))
 			(selobj (make-selector sel))
-			(invoke (lambda (vm args) 
-				  (tag-pointer (create_invocation_block vm imp) 'block)))
+			(invoke (lambda (vm args rls) 
+				  (tag-pointer (create_invocation_block vm imp rls) 'block)))
 			(push (build-argument-passing types invoke selector))
 			(call (make-caller receiver selobj push)))
 		   call)
@@ -405,7 +445,7 @@ EOF
 			(len (string-length types))
 			(imp ((if super? lookup_message_for_superclass objc_msg_lookup) receiver sel))
 			(selobj (make-selector sel))
-			(invoke (lambda (vm args) (dispatch_invocation_block vm imp)))
+			(invoke (lambda (vm args rls) (dispatch_invocation_block vm imp rls)))
 			(push (build-argument-passing types invoke selector))
 			(call (make-caller receiver selobj push)))
 		   call)
