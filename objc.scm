@@ -34,6 +34,7 @@
 #ifdef __APPLE__
 #include <Block.h>
 #include <dispatch/dispatch.h>
+#include <pthread.h>
 #endif
 
 #ifdef __GNUSTEP__
@@ -62,6 +63,47 @@ static void *objc_msg_lookup_super(struct objc_super *sup, void *sel)
 
   return class_getMethodImplementation(c, sel);
 }
+
+typedef struct rlist {
+  void *obj;
+  struct rlist *next;
+} RLIST;
+
+pthread_mutex_t rlist_mutex = PTHREAD_MUTEX_INITIALIZER;
+RLIST *gcroot_deletion_list = NULL;
+
+void enqueue_gc_root_for_deletion(void *gcroot)
+{
+  RLIST *node = (RLIST *)malloc(sizeof(RLIST));
+  pthread_mutex_lock(&rlist_mutex);
+  node->obj = gcroot;
+  node->next = gcroot_deletion_list;
+  gcroot_deletion_list = node;
+  pthread_mutex_unlock(&rlist_mutex);
+}
+
+void clear_gcroot_deletion_list()
+{
+  RLIST *node, *node2;
+
+  /* this check is done without locking - `gcroot_deletion-list' is only written to
+     outside of this method when it already has a non-NULL value. */
+  if(gcroot_deletion_list != NULL) {
+    pthread_mutex_lock(&rlist_mutex);
+    node = gcroot_deletion_list; 
+
+    while(node != NULL) {
+      node2 = node;
+      node = node->next;
+      CHICKEN_delete_gc_root(node2->obj);
+      free(node2);
+    }
+
+    gcroot_deletion_list = NULL;
+    pthread_mutex_unlock(&rlist_mutex);
+  }
+}
+
 #else
 static void *Block_copy(void *x) { return NULL; }
 static void Block_release(void *x) {}
@@ -198,11 +240,12 @@ ___safe void *create_invocation_block(DCCallVM *vm, void *imp, ___scheme_value l
   void *root = CHICKEN_new_gc_root();
   CHICKEN_gc_root_set(root, lst);
 #ifdef __APPLE__
+  clear_gcroot_deletion_list();
   void (^b)() = ^{ 
     dcCallVoid(vm, imp); 
     dcFree(vm);
     release_temporary_storage(CHICKEN_gc_root_ref(root));
-    CHICKEN_delete_gc_root(root);
+    enqueue_gc_root_for_deletion(root);
   };
   Block_copy(b);
   return b;
@@ -216,12 +259,13 @@ ___safe void dispatch_invocation_block(DCCallVM *vm, void *imp, ___scheme_value 
   void *root = CHICKEN_new_gc_root();
   CHICKEN_gc_root_set(root, lst);
 #ifdef __APPLE__
+  clear_gcroot_deletion_list();
   dispatch_async(dispatch_get_main_queue(), 
 		 ^{ 
 		    dcCallVoid(vm, imp); 
 	            dcFree(vm); 
                     release_temporary_storage(CHICKEN_gc_root_ref(root));
-                    CHICKEN_delete_gc_root(root);
+                    enqueue_gc_root_for_deletion(root);
                   });
 #else
   fprintf(stderr, "\"@/main-thread\" is not available on this platform.\n");
