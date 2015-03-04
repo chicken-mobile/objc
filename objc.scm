@@ -39,7 +39,7 @@
 
 #ifdef __GNUSTEP__
 # define _NATIVE_OBJC_ECXEPTIONS
-#elif defined(__APPLE__) && !defined(__arm__) && !defined(__ARM_ARCH)
+#elif defined(__APPLE__) && !defined(__arm__) && !defined(__ARM_ARCH) && !defined(__arm64__)
 # include <objc/objc-runtime.h>
 # include <objc/objc-class.h>
 #endif
