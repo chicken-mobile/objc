@@ -117,6 +117,7 @@ void Block_release(void *);
 
 void dcFree(DCCallVM *);
 
+void dcArgBool(DCCallVM *, bool);
 void dcArgChar(DCCallVM *, char);
 void dcArgShort(DCCallVM *, short);
 void dcArgInt(DCCallVM *, int);
@@ -127,6 +128,7 @@ void dcArgDouble(DCCallVM *, double);
 void dcArgPointer(DCCallVM *, void *);
 
 ___safe void dcCallVoid(DCCallVM *, void *);
+___safe bool dcCallBool(DCCallVM *, void *);
 ___safe char dcCallChar(DCCallVM *, void *);
 ___safe short dcCallShort(DCCallVM *, void *);
 ___safe int dcCallInt(DCCallVM *, void *);
@@ -337,6 +339,7 @@ EOF
 	    (let ((t (string-ref types i))
 		  (k (loop (skip-type i types))))
 	      (case t
+		((#\B) (dpush dcArgBool k))
 		((#\c #\C)
 		 ;; hack around absent "bool" type
 		 (lambda (vm args rls)
@@ -396,6 +399,7 @@ EOF
 	 (lambda (vm args rls)
 	   (dcCallVoid vm imp)
 	   (release_temporary_storage rls)))
+	((#\B) (dcall dcCallBool imp))
 	((#\c #\C) 
 	 (lambda (vm args rls)
 	   ;; hack around absent "bool" type
